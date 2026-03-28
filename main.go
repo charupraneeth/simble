@@ -95,7 +95,7 @@ func (app *App) handleRequest(w http.ResponseWriter, r *http.Request) {
 func main() {
 	mux := http.NewServeMux()
 
-	db, err := geoip2.Open("./GeoLite2-City_20260317/GeoLite2-City.mmdb")
+	db, err := geoip2.Open("./GeoLite2-City/GeoLite2-City.mmdb")
 	if err != nil {
 		log.Fatal(err)
 	}
