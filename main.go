@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"net/netip"
+	"os"
 
 	"github.com/medama-io/go-useragent"
 	"github.com/oschwald/geoip2-golang/v2"
@@ -107,5 +108,11 @@ func main() {
 
 	mux.HandleFunc("/", app.handleRequest)
 
-	http.ListenAndServe(":8080", mux)
+	port := os.Getenv("PORT")
+
+	if port == "" {
+		port = "8080"
+	}
+
+	log.Fatal(http.ListenAndServe(":"+port, mux))
 }
