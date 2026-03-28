@@ -17,3 +17,5 @@
 # GeoLite2 Database
 GeoLite2-City/
 *.mmdb
+
+main

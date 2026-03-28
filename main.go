@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/netip"
 	"os"
+	"strings"
 
 	"github.com/medama-io/go-useragent"
 	"github.com/oschwald/geoip2-golang/v2"
@@ -28,6 +29,28 @@ type App struct {
 	UAParser *useragent.Parser
 }
 
+func getRealIP(r *http.Request) string {
+	// Check for X-Forwared-For header
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		return strings.TrimSpace(strings.Split(xff, ",")[0])
+	}
+
+	// Check for X-Real-IP header
+	if xri := r.Header.Get("X-Real-IP"); xri != "" {
+		return xri
+	}
+
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+
+	if err != nil {
+		fmt.Println("error splitting host/port: ", err)
+		return ""
+	}
+
+	return host
+
+}
+
 func (app *App) handleRequest(w http.ResponseWriter, r *http.Request) {
 
 	uaString := r.Header.Get("User-Agent")
@@ -38,14 +61,7 @@ func (app *App) handleRequest(w http.ResponseWriter, r *http.Request) {
 	os := agent.OS()
 	referer := r.Referer()
 
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-
-	if err != nil {
-		fmt.Println("error splitting host/port: ", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-
-		return
-	}
+	host := getRealIP(r)
 
 	ip, err := netip.ParseAddr(host)
 
