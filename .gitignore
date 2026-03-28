@@ -15,5 +15,5 @@
 # vendor/
 
 # GeoLite2 Database
-GeoLite2-City_20260317/
+GeoLite2-City/
 *.mmdb
