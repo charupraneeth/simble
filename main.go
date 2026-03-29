@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -9,19 +10,20 @@ import (
 	"net/netip"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/medama-io/go-useragent"
 	"github.com/oschwald/geoip2-golang/v2"
 )
 
 type ResponseData struct {
-	Device  string `json:"device"`
-	Browser string `json:"browser"`
-	Os      string `json:"os"`
-	Referer string `json:"referer"`
-	Host    string `json:"host"`
-	Country string `json:"country"`
-	City    string `json:"city"`
+	Device    string `json:"device"`
+	Browser   string `json:"browser"`
+	Os        string `json:"os"`
+	Referer   string `json:"referer"`
+	VisitorID string `json:"visitor_id"`
+	Country   string `json:"country"`
+	City      string `json:"city"`
 }
 
 type App struct {
@@ -51,15 +53,20 @@ func getRealIP(r *http.Request) string {
 
 }
 
+func getDailyVisitorID(host, ua, salt string) string {
+	date := time.Now().Format("2006-01-02")
+
+	data := fmt.Sprintf("%s|%s|%s|%s", host, ua, salt, date)
+
+	hash := sha256.Sum256([]byte(data))
+
+	return fmt.Sprintf("%x", hash)[:16]
+}
+
 func (app *App) handleRequest(w http.ResponseWriter, r *http.Request) {
 
 	uaString := r.Header.Get("User-Agent")
 	agent := app.UAParser.Parse(uaString)
-
-	browser := agent.Browser()
-	device := agent.Device()
-	os := agent.OS()
-	referer := r.Referer()
 
 	host := getRealIP(r)
 
@@ -89,17 +96,24 @@ func (app *App) handleRequest(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("No data found for this IP")
 	}
 
-	response := ResponseData{
-		Device:  device.String(),
-		Browser: browser.String(),
-		Os:      os.String(),
-		Referer: referer,
-		Host:    host,
-		Country: country,
-		City:    city,
+	salt := os.Getenv("VISITOR_ID_SALT")
+	if salt == "" {
+		salt = "fallback-temp-salt" // for local dev
 	}
 
-	fmt.Println(response)
+	visitorID := getDailyVisitorID(host, uaString, salt)
+
+	response := ResponseData{
+		Device:    agent.Device().String(),
+		Browser:   agent.Browser().String(),
+		Os:        agent.OS().String(),
+		Referer:   r.Referer(),
+		VisitorID: visitorID,
+		Country:   country,
+		City:      city,
+	}
+
+	log.Printf("Respoinse: %v\n", response)
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(response); err != nil {
