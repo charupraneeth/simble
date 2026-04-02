@@ -182,7 +182,12 @@ func (app *App) handleRequest(w http.ResponseWriter, r *http.Request) {
 
 	visitorID := getDailyVisitorID(host, uaString, salt)
 
-	response := Event{
+	insertQuery := `INSERT INTO analytics(
+	 					site_id, visitor_id, path, browser_name, device_type, os_name, country_code, city_name
+					)
+					VALUES($1, $2, $3, $4, $5, $6, $7, $8);`
+
+	event := Event{
 		Device:      agent.Device().String(),
 		Browser:     agent.Browser().String(),
 		Os:          agent.OS().String(),
@@ -195,13 +200,17 @@ func (app *App) handleRequest(w http.ResponseWriter, r *http.Request) {
 		SiteID:      siteID,
 	}
 
-	log.Printf("Response: %v\n", response)
+	_, err = app.DB.Exec(r.Context(), insertQuery, event.SiteID, event.VisitorID, event.Path, event.Browser, event.Device, event.Os, event.CountryCode, event.City)
 
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	if err != nil {
+		fmt.Println("Failed to insert record")
+		w.WriteHeader(http.StatusAccepted)
 		return
 	}
+
+	log.Printf("Event inserted: %v\n", event)
+
+	w.WriteHeader(http.StatusAccepted)
 }
 
 func main() {
