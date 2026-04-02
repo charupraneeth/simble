@@ -107,6 +107,7 @@ func (app *App) handleRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	r.Body = http.MaxBytesReader(w, r.Body, 1024) // 1KB
 	var payload RequestPayload
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
@@ -221,7 +222,7 @@ func (app *App) handleRequest(w http.ResponseWriter, r *http.Request) {
 	_, err = app.DB.Exec(r.Context(), insertQuery, event.SiteID, event.VisitorID, event.Path, event.Browser, event.Device, event.Os, event.CountryCode, event.City)
 
 	if err != nil {
-		fmt.Println("Failed to insert record")
+		log.Printf("CRITICAL: Failed to insert analytics event for site %d: %v", siteID, err)
 		w.WriteHeader(http.StatusAccepted)
 		return
 	}
@@ -277,5 +278,13 @@ func main() {
 		port = "8080"
 	}
 
-	log.Fatal(http.ListenAndServe(":"+port, mux))
+	server := &http.Server{
+		Addr:         ":" + port,
+		Handler:      mux,
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
+
+	log.Fatal(server.ListenAndServe())
 }
