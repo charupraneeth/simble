@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/golang-migrate/migrate/v4"
@@ -147,26 +148,40 @@ func (app *App) handleRequest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var siteID int64
-	siteQuery := `SELECT id from sites where domain = $1`
-	err = app.DB.QueryRow(r.Context(), siteQuery, payload.Domain).Scan(&siteID)
+	var siteErr error
+	var record *geoip2.City
+	var geoErr error
 
-	if err != nil {
-		if err == pgx.ErrNoRows {
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+		siteQuery := `SELECT id from sites where domain = $1`
+		siteErr = app.DB.QueryRow(r.Context(), siteQuery, payload.Domain).Scan(&siteID)
+	}()
+
+	go func() {
+		defer wg.Done()
+		record, geoErr = app.GeoDB.City(ip)
+	}()
+
+	wg.Wait()
+
+	if siteErr != nil {
+		if siteErr == pgx.ErrNoRows {
 			http.Error(w, "Site not registered", http.StatusNotFound)
 			return
 		}
 
-		fmt.Printf("Error querying site %v\n", err)
+		log.Printf("Error querying site %v\n", siteErr)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	record, err := app.GeoDB.City(ip)
-	if err != nil {
-		fmt.Println("error getting city from ip", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-
-		return
+	if geoErr != nil {
+		log.Printf("GeoIP lookup failed: %v", geoErr)
+		// dont return we can still record the event without the geo data
 	}
 
 	countryCode := ""
