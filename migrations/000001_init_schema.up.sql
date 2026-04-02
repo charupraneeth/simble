@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS sites (
 ) ;
 
 create table if not exists analytics(
-	id BIGINT primary key,
+	id BIGSERIAL primary key,
 	site_id integer references sites(id) on delete cascade not null,
 	
 	visitor_id varchar(16) not null,

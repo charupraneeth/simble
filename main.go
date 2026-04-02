@@ -17,13 +17,13 @@ import (
 )
 
 type ResponseData struct {
-	Device    string `json:"device"`
-	Browser   string `json:"browser"`
-	Os        string `json:"os"`
-	Referer   string `json:"referer"`
-	VisitorID string `json:"visitor_id"`
-	Country   string `json:"country"`
-	City      string `json:"city"`
+	Device      string `json:"device"`
+	Browser     string `json:"browser"`
+	Os          string `json:"os"`
+	Referer     string `json:"referer"`
+	VisitorID   string `json:"visitor_id"`
+	CountryCode string `json:"country_code"`
+	City        string `json:"city"`
 }
 
 type App struct {
@@ -87,10 +87,10 @@ func (app *App) handleRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	country := ""
+	country_code := ""
 	city := ""
 	if record.HasData() {
-		country = record.Country.Names.English
+		country_code = record.Country.ISOCode
 		city = record.City.Names.English
 	} else {
 		fmt.Println("No data found for this IP")
@@ -104,13 +104,13 @@ func (app *App) handleRequest(w http.ResponseWriter, r *http.Request) {
 	visitorID := getDailyVisitorID(host, uaString, salt)
 
 	response := ResponseData{
-		Device:    agent.Device().String(),
-		Browser:   agent.Browser().String(),
-		Os:        agent.OS().String(),
-		Referer:   r.Referer(),
-		VisitorID: visitorID,
-		Country:   country,
-		City:      city,
+		Device:      agent.Device().String(),
+		Browser:     agent.Browser().String(),
+		Os:          agent.OS().String(),
+		Referer:     r.Referer(),
+		VisitorID:   visitorID,
+		CountryCode: country_code,
+		City:        city,
 	}
 
 	log.Printf("Respoinse: %v\n", response)
@@ -125,16 +125,16 @@ func (app *App) handleRequest(w http.ResponseWriter, r *http.Request) {
 func main() {
 	mux := http.NewServeMux()
 
-	db, err := geoip2.Open("./GeoLite2-City/GeoLite2-City.mmdb")
+	geoDB, err := geoip2.Open("./GeoLite2-City/GeoLite2-City.mmdb")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	defer db.Close()
+	defer geoDB.Close()
 
 	ua := useragent.NewParser()
 
-	app := &App{GeoDB: db, UAParser: ua}
+	app := &App{GeoDB: geoDB, UAParser: ua}
 
 	mux.HandleFunc("/", app.handleRequest)
 
