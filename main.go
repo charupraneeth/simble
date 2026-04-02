@@ -14,6 +14,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/golang-migrate/migrate/v4"
+	_ "github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/medama-io/go-useragent"
@@ -225,6 +228,19 @@ func main() {
 	defer geoDB.Close()
 
 	dbString := os.Getenv("DATABASE_URL")
+
+	if os.Getenv("AUTO_MIGRATE_DB") == "true" {
+		log.Println("Running database migrations...")
+		m, err := migrate.New("file://migrations", dbString)
+
+		if err != nil && err != migrate.ErrNoChange {
+			log.Fatalf("Failed to initialize migrations: %v", err)
+		}
+		if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+			log.Fatalf("Failed to run migrations: %v", err)
+		}
+		log.Println("Database Migrations applied successfully!")
+	}
 
 	db, err := pgxpool.New(ctx, dbString)
 	if err != nil {
