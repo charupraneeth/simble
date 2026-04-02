@@ -251,6 +251,9 @@ func main() {
 
 	app := &App{GeoDB: geoDB, UAParser: ua, DB: db}
 
+	mux.HandleFunc("/script.js", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./public/script.js")
+	})
 	mux.HandleFunc("/api/event", app.handleRequest)
 
 	port := os.Getenv("PORT")
