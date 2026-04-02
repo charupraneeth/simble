@@ -85,6 +85,11 @@ func (app *App) handleRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
 	reqOrigin := r.Header.Get("Origin")
 
 	originURL, err := url.Parse(reqOrigin)
@@ -192,7 +197,7 @@ func main() {
 
 	app := &App{GeoDB: geoDB, UAParser: ua}
 
-	mux.HandleFunc("POST /api/event", app.handleRequest)
+	mux.HandleFunc("/api/event", app.handleRequest)
 
 	port := os.Getenv("PORT")
 
