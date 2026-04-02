@@ -26,6 +26,7 @@ type Event struct {
 	CountryCode string `json:"country_code"`
 	City        string `json:"city"`
 	Name        string `json:"name"`
+	Path        string `json:"path"`
 }
 
 type RequestPayload struct {
@@ -73,6 +74,17 @@ func getDailyVisitorID(host, ua, salt string) string {
 }
 
 func (app *App) handleRequest(w http.ResponseWriter, r *http.Request) {
+
+	// Set CORS header
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
 	reqOrigin := r.Header.Get("Origin")
 
 	originURL, err := url.Parse(reqOrigin)
@@ -87,9 +99,25 @@ func (app *App) handleRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if originURL.Host != payload.Domain {
+	if originURL.Hostname() != payload.Domain {
 		http.Error(w, "Invalid domain", http.StatusForbidden)
 		return
+	}
+
+	parsedBodyURL, err := url.Parse(payload.URL)
+	if err != nil {
+		http.Error(w, "Invalid url", http.StatusForbidden)
+		return
+	}
+
+	if strings.TrimPrefix(parsedBodyURL.Hostname(), "www.") != payload.Domain {
+		http.Error(w, "URL host does not match payload domain", http.StatusForbidden)
+		return
+	}
+
+	path := parsedBodyURL.Path
+	if path == "" {
+		path = "/"
 	}
 
 	uaString := r.Header.Get("User-Agent")
@@ -138,6 +166,7 @@ func (app *App) handleRequest(w http.ResponseWriter, r *http.Request) {
 		CountryCode: country_code,
 		City:        city,
 		Name:        payload.Name,
+		Path:        path,
 	}
 
 	log.Printf("Response: %v\n", response)
