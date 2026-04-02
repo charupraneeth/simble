@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"net/netip"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -16,7 +17,7 @@ import (
 	"github.com/oschwald/geoip2-golang/v2"
 )
 
-type ResponseData struct {
+type Event struct {
 	Device      string `json:"device"`
 	Browser     string `json:"browser"`
 	Os          string `json:"os"`
@@ -24,6 +25,14 @@ type ResponseData struct {
 	VisitorID   string `json:"visitor_id"`
 	CountryCode string `json:"country_code"`
 	City        string `json:"city"`
+	Name        string `json:"name"`
+}
+
+type RequestPayload struct {
+	Domain  string `json:"domain"`
+	Name    string `json:"name"`
+	Referer string `json:"referer"`
+	URL     string `json:"url"`
 }
 
 type App struct {
@@ -64,6 +73,24 @@ func getDailyVisitorID(host, ua, salt string) string {
 }
 
 func (app *App) handleRequest(w http.ResponseWriter, r *http.Request) {
+	reqOrigin := r.Header.Get("Origin")
+
+	originURL, err := url.Parse(reqOrigin)
+	if err != nil {
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
+
+	var payload RequestPayload
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	if originURL.Host != payload.Domain {
+		http.Error(w, "Invalid domain", http.StatusForbidden)
+		return
+	}
 
 	uaString := r.Header.Get("User-Agent")
 	agent := app.UAParser.Parse(uaString)
@@ -71,7 +98,6 @@ func (app *App) handleRequest(w http.ResponseWriter, r *http.Request) {
 	host := getRealIP(r)
 
 	ip, err := netip.ParseAddr(host)
-
 	if err != nil {
 		fmt.Println("error getting ip from ip string", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -103,7 +129,7 @@ func (app *App) handleRequest(w http.ResponseWriter, r *http.Request) {
 
 	visitorID := getDailyVisitorID(host, uaString, salt)
 
-	response := ResponseData{
+	response := Event{
 		Device:      agent.Device().String(),
 		Browser:     agent.Browser().String(),
 		Os:          agent.OS().String(),
@@ -111,9 +137,10 @@ func (app *App) handleRequest(w http.ResponseWriter, r *http.Request) {
 		VisitorID:   visitorID,
 		CountryCode: country_code,
 		City:        city,
+		Name:        payload.Name,
 	}
 
-	log.Printf("Respoinse: %v\n", response)
+	log.Printf("Response: %v\n", response)
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(response); err != nil {
@@ -136,7 +163,7 @@ func main() {
 
 	app := &App{GeoDB: geoDB, UAParser: ua}
 
-	mux.HandleFunc("/", app.handleRequest)
+	mux.HandleFunc("POST /api/event", app.handleRequest)
 
 	port := os.Getenv("PORT")
 
