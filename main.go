@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
@@ -13,6 +14,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/medama-io/go-useragent"
 	"github.com/oschwald/geoip2-golang/v2"
 )
@@ -27,6 +30,7 @@ type Event struct {
 	City        string `json:"city"`
 	Name        string `json:"name"`
 	Path        string `json:"path"`
+	SiteID      int64  `json:"site_id"`
 }
 
 type RequestPayload struct {
@@ -39,6 +43,7 @@ type RequestPayload struct {
 type App struct {
 	GeoDB    *geoip2.Reader
 	UAParser *useragent.Parser
+	DB       *pgxpool.Pool
 }
 
 func getRealIP(r *http.Request) string {
@@ -138,6 +143,21 @@ func (app *App) handleRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var siteID int64
+	siteQuery := `SELECT id from sites where domain = $1`
+	err = app.DB.QueryRow(r.Context(), siteQuery, payload.Domain).Scan(&siteID)
+
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			http.Error(w, "Site not registered", http.StatusNotFound)
+			return
+		}
+
+		fmt.Printf("Error querying site %v\n", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
 	record, err := app.GeoDB.City(ip)
 	if err != nil {
 		fmt.Println("error getting city from ip", err)
@@ -146,10 +166,10 @@ func (app *App) handleRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	country_code := ""
+	countryCode := ""
 	city := ""
 	if record.HasData() {
-		country_code = record.Country.ISOCode
+		countryCode = record.Country.ISOCode
 		city = record.City.Names.English
 	} else {
 		fmt.Println("No data found for this IP")
@@ -168,10 +188,11 @@ func (app *App) handleRequest(w http.ResponseWriter, r *http.Request) {
 		Os:          agent.OS().String(),
 		Referer:     r.Referer(),
 		VisitorID:   visitorID,
-		CountryCode: country_code,
+		CountryCode: countryCode,
 		City:        city,
 		Name:        payload.Name,
 		Path:        path,
+		SiteID:      siteID,
 	}
 
 	log.Printf("Response: %v\n", response)
@@ -185,6 +206,7 @@ func (app *App) handleRequest(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	mux := http.NewServeMux()
+	ctx := context.Background()
 
 	geoDB, err := geoip2.Open("./GeoLite2-City/GeoLite2-City.mmdb")
 	if err != nil {
@@ -193,9 +215,16 @@ func main() {
 
 	defer geoDB.Close()
 
+	dbString := os.Getenv("DATABASE_URL")
+
+	db, err := pgxpool.New(ctx, dbString)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	ua := useragent.NewParser()
 
-	app := &App{GeoDB: geoDB, UAParser: ua}
+	app := &App{GeoDB: geoDB, UAParser: ua, DB: db}
 
 	mux.HandleFunc("/api/event", app.handleRequest)
 
