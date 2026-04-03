@@ -75,7 +75,7 @@ func getRealIP(r *http.Request) string {
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 
 	if err != nil {
-		fmt.Println("error splitting host/port: ", err)
+		log.Println("error splitting host/port: ", err)
 		return ""
 	}
 
@@ -108,21 +108,22 @@ func getGithubDetails(token string) (GitHubUser, error) {
 	client := &http.Client{}
 	url := "https://api.github.com/user"
 
-	req, _ := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return GitHubUser{}, fmt.Errorf("Error creating request to github user: %w", err)
+	}
 
 	req.Header.Set("Authorization", "token "+token)
 
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Fatalln("Error requesting github user:", err)
-		return GitHubUser{}, err
+		return GitHubUser{}, fmt.Errorf("Error requesting github user: %w", err)
 	}
 
 	defer resp.Body.Close()
 	var githubUser GitHubUser
 	if err := json.NewDecoder(resp.Body).Decode(&githubUser); err != nil {
-		log.Fatalln("Error decoding github user response:", err)
-		return GitHubUser{}, err
+		return GitHubUser{}, fmt.Errorf("Error decoding github user response: %w", err)
 	}
 
 	return githubUser, nil
@@ -188,7 +189,7 @@ func (app *App) handleRequest(w http.ResponseWriter, r *http.Request) {
 
 	ip, err := netip.ParseAddr(host)
 	if err != nil {
-		fmt.Println("error getting ip from ip string", err)
+		log.Println("error getting ip from ip string", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 
 		return
@@ -237,7 +238,7 @@ func (app *App) handleRequest(w http.ResponseWriter, r *http.Request) {
 		countryCode = record.Country.ISOCode
 		city = record.City.Names.English
 	} else {
-		fmt.Println("No data found for this IP")
+		log.Println("No data found for this IP")
 	}
 
 	salt := os.Getenv("VISITOR_ID_SALT")
