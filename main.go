@@ -413,12 +413,24 @@ func main() {
 
 	app := &App{GeoDB: geoDB, UAParser: ua, DB: db, OAuthConfig: oauthConfig}
 
-	mux.HandleFunc("/script.js", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /script.js", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./public/script.js")
 	})
-	mux.HandleFunc("/auth/github", app.handleGitHubLogin)
-	mux.HandleFunc("/auth/github/callback", app.handleGitHubCallback)
+	mux.HandleFunc("GET /auth/github", app.handleGitHubLogin)
+	mux.HandleFunc("GET /auth/github/callback", app.handleGitHubCallback)
 	mux.HandleFunc("/api/event", app.handleRequest)
+
+	distFS := http.Dir("./public/dist")
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Path
+		if f, err := distFS.Open(path); err == nil {
+			f.Close()
+			http.FileServer(distFS).ServeHTTP(w, r)
+			return
+		}
+		// Fallback to index.html for all unmatched routes and let vue router handle it
+		http.ServeFile(w, r, "./public/dist/index.html")
+	})
 
 	port := os.Getenv("PORT")
 
