@@ -1,5 +1,6 @@
 import { createApp } from 'vue'
-import './style.css'
 import App from './App.vue'
+import '@knadh/oat/oat.min.css';
+import '@knadh/oat/oat.min.js';
 
 createApp(App).mount('#app')

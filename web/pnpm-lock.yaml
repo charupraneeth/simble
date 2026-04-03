@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@knadh/oat':
+        specifier: ^0.5.1
+        version: 0.5.1
       vue:
         specifier: ^3.5.30
         version: 3.5.32(typescript@5.9.3)
@@ -61,6 +64,9 @@ packages:
 
   '@jridgewell/sourcemap-codec@1.5.5':
     resolution: {integrity: sha512-cYQ9310grqxueWbl+WuIUIaiUaDcj7WOq5fVhEljNVgRfOUhY9fy2zTvfoqWsnebh8Sl70VScFbICvJnLKB0Og==}
+
+  '@knadh/oat@0.5.1':
+    resolution: {integrity: sha512-3cRKEfGLLLrqAjzUGG0BpCZn9ndxVJE2thNv/IB0blcSGR6Wgs1BSEZjL3/7BzDEf2jnGCgXE3OG7W1kDwM4EQ==}
 
   '@napi-rs/wasm-runtime@1.1.2':
     resolution: {integrity: sha512-sNXv5oLJ7ob93xkZ1XnxisYhGYXfaG9f65/ZgYuAu3qt7b3NadcOEhLvx28hv31PgX8SZJRYrAIPQilQmFpLVw==}
@@ -473,6 +479,8 @@ snapshots:
     optional: true
 
   '@jridgewell/sourcemap-codec@1.5.5': {}
+
+  '@knadh/oat@0.5.1': {}
 
   '@napi-rs/wasm-runtime@1.1.2(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)':
     dependencies:

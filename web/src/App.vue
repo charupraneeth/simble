@@ -1,7 +1,12 @@
 <script setup lang="ts">
-import HelloWorld from './components/HelloWorld.vue'
+const handleGetMe = async ()=>{
+  const response = await fetch("/api/me")
+  const json = await response.json()
+  console.log(json)
+}
+
 </script>
 
 <template>
-  <HelloWorld />
+  <button @click="handleGetMe">get me</button>
 </template>

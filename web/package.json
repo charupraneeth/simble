@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@knadh/oat": "^0.5.1",
     "vue": "^3.5.30"
   },
   "devDependencies": {

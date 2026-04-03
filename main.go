@@ -54,6 +54,12 @@ type GitHubUser struct {
 	Email string `json:"email"` // might be empty string or null
 }
 
+type User struct {
+	Username  string    `json:"username"`
+	Email     *string   `json:"email"` // this can be null if the user had made it private
+	ExpiresAt time.Time `json:"expires_at"`
+}
+
 type App struct {
 	GeoDB       *geoip2.Reader
 	UAParser    *useragent.Parser
@@ -367,7 +373,40 @@ func (app *App) handleGitHubCallback(w http.ResponseWriter, r *http.Request) {
 		Path:     "/",
 	})
 
-	http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
+	frontendURL := os.Getenv("FRONTEND_URL")
+	if frontendURL == "" {
+		frontendURL = "/"
+	}
+
+	http.Redirect(w, r, frontendURL, http.StatusTemporaryRedirect)
+}
+
+func (app *App) handleGetMe(w http.ResponseWriter, r *http.Request) {
+	token, err := r.Cookie("session")
+	if err != nil {
+		log.Println("Invalid cookie in header")
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	query := `
+		SELECT u.username, u.email, s.expires_at
+		FROM sessions s
+		JOIN users u ON s.user_id = u.id
+		WHERE s.token  = $1 
+		AND s.expires_at > CURRENT_TIMESTAMP;
+	`
+
+	var user User
+	err = app.DB.QueryRow(r.Context(), query, token.Value).Scan(&user.Username, &user.Email, &user.ExpiresAt)
+	if err != nil {
+		log.Println("Failed to get user with given session token")
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(user)
 }
 
 func main() {
@@ -419,6 +458,7 @@ func main() {
 	mux.HandleFunc("GET /auth/github", app.handleGitHubLogin)
 	mux.HandleFunc("GET /auth/github/callback", app.handleGitHubCallback)
 	mux.HandleFunc("/api/event", app.handleRequest)
+	mux.HandleFunc("GET /api/me", app.handleGetMe)
 
 	distFS := http.Dir("./public/dist")
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
