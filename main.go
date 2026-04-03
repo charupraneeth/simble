@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -22,6 +24,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/medama-io/go-useragent"
 	"github.com/oschwald/geoip2-golang/v2"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/github"
 )
 
 type Event struct {
@@ -44,10 +48,17 @@ type RequestPayload struct {
 	URL     string `json:"url"`
 }
 
+type GitHubUser struct {
+	ID    int64  `json:"id"`
+	Login string `json:"login"` // the @username
+	Email string `json:"email"` // might be empty string or null
+}
+
 type App struct {
-	GeoDB    *geoip2.Reader
-	UAParser *useragent.Parser
-	DB       *pgxpool.Pool
+	GeoDB       *geoip2.Reader
+	UAParser    *useragent.Parser
+	DB          *pgxpool.Pool
+	OAuthConfig *oauth2.Config
 }
 
 func getRealIP(r *http.Request) string {
@@ -80,6 +91,41 @@ func getDailyVisitorID(host, ua, salt string) string {
 	hash := sha256.Sum256([]byte(data))
 
 	return fmt.Sprintf("%x", hash)[:16]
+}
+
+func generateCSRFToken(n int) (string, error) {
+	b := make([]byte, n)
+	_, err := rand.Read(b)
+
+	if err != nil {
+		return "", err
+	}
+
+	return base64.URLEncoding.EncodeToString(b), nil
+}
+
+func getGithubDetails(token string) (GitHubUser, error) {
+	client := &http.Client{}
+	url := "https://api.github.com/user"
+
+	req, _ := http.NewRequest("GET", url, nil)
+
+	req.Header.Set("Authorization", "token "+token)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Fatalln("Error requesting github user:", err)
+		return GitHubUser{}, err
+	}
+
+	defer resp.Body.Close()
+	var githubUser GitHubUser
+	if err := json.NewDecoder(resp.Body).Decode(&githubUser); err != nil {
+		log.Fatalln("Error decoding github user response:", err)
+		return GitHubUser{}, err
+	}
+
+	return githubUser, nil
 }
 
 func (app *App) handleRequest(w http.ResponseWriter, r *http.Request) {
@@ -232,6 +278,70 @@ func (app *App) handleRequest(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusAccepted)
 }
 
+func (app *App) handleGitHubLogin(w http.ResponseWriter, r *http.Request) {
+	state, err := generateCSRFToken(32)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "oauth_state",
+		Value:    state,
+		HttpOnly: true,
+		MaxAge:   300,
+		SameSite: http.SameSiteLaxMode,
+		Path:     "/",
+	})
+	url := app.OAuthConfig.AuthCodeURL(state)
+
+	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
+}
+
+func (app *App) handleGitHubCallback(w http.ResponseWriter, r *http.Request) {
+	stateCookie, err := r.Cookie("oauth_state")
+
+	if err != nil || stateCookie.Value != r.URL.Query().Get("state") {
+		http.Error(w, "Invalid state", http.StatusBadRequest)
+		return
+	}
+
+	code := r.URL.Query().Get("code")
+
+	token, err := app.OAuthConfig.Exchange(r.Context(), code)
+
+	if err != nil {
+		http.Error(w, "Failed to exchange token", http.StatusInternalServerError)
+		return
+	}
+
+	log.Println("Token recieved: ", token)
+
+	githubUser, err := getGithubDetails(token.AccessToken)
+	if err != nil {
+		http.Error(w, "Failed to fetch github user", http.StatusInternalServerError)
+		return
+	}
+
+	userIDQuery := `
+		INSERT INTO users (github_id, email, username)
+		VALUES($1, $2, $3)
+		on conflict(github_id) 
+		do update set email = EXCLUDED.email
+		returning id
+	`
+
+	var userID int64
+	err = app.DB.QueryRow(r.Context(), userIDQuery, githubUser.ID, githubUser.Email, githubUser.Login).Scan(&userID)
+	if err != nil {
+		log.Printf("Failed to insert user into DB: %v", err)
+		http.Error(w, "Failed to register github user", http.StatusInternalServerError)
+		return
+	}
+
+	log.Println("User ID: ", userID)
+}
+
 func main() {
 	mux := http.NewServeMux()
 	ctx := context.Background()
@@ -265,11 +375,21 @@ func main() {
 
 	ua := useragent.NewParser()
 
-	app := &App{GeoDB: geoDB, UAParser: ua, DB: db}
+	oauthConfig := &oauth2.Config{
+		ClientID:     os.Getenv("GITHUB_CLIENT_ID"),
+		ClientSecret: os.Getenv("GITHUB_CLIENT_SECRET"),
+		Scopes:       []string{"user:email"},
+		Endpoint:     github.Endpoint,
+		RedirectURL:  os.Getenv("GITHUB_REDIRECT_URL"),
+	}
+
+	app := &App{GeoDB: geoDB, UAParser: ua, DB: db, OAuthConfig: oauthConfig}
 
 	mux.HandleFunc("/script.js", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./public/script.js")
 	})
+	mux.HandleFunc("/auth/github", app.handleGitHubLogin)
+	mux.HandleFunc("/auth/github/callback", app.handleGitHubCallback)
 	mux.HandleFunc("/api/event", app.handleRequest)
 
 	port := os.Getenv("PORT")
