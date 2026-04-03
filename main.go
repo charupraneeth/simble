@@ -93,7 +93,7 @@ func getDailyVisitorID(host, ua, salt string) string {
 	return fmt.Sprintf("%x", hash)[:16]
 }
 
-func generateCSRFToken(n int) (string, error) {
+func generateRandomToken(n int) (string, error) {
 	b := make([]byte, n)
 	_, err := rand.Read(b)
 
@@ -279,7 +279,7 @@ func (app *App) handleRequest(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *App) handleGitHubLogin(w http.ResponseWriter, r *http.Request) {
-	state, err := generateCSRFToken(32)
+	state, err := generateRandomToken(32)
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
@@ -315,8 +315,6 @@ func (app *App) handleGitHubCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Println("Token recieved: ", token)
-
 	githubUser, err := getGithubDetails(token.AccessToken)
 	if err != nil {
 		http.Error(w, "Failed to fetch github user", http.StatusInternalServerError)
@@ -339,7 +337,36 @@ func (app *App) handleGitHubCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Println("User ID: ", userID)
+	sessionToken, err := generateRandomToken(32)
+	if err != nil {
+		http.Error(w, "Failed to generate session", http.StatusInternalServerError)
+		return
+	}
+
+	expiresAt := time.Now().Add(30 * 24 * time.Hour) // 30 days from now
+
+	sessionQuery := `
+		INSERT INTO sessions (token, user_id , expires_at)
+		VALUES ($1, $2, $3)
+	`
+
+	_, err = app.DB.Exec(r.Context(), sessionQuery, sessionToken, userID, expiresAt)
+	if err != nil {
+		http.Error(w, "Failed to created session", http.StatusInternalServerError)
+		return
+	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "session",
+		Value:    sessionToken,
+		HttpOnly: true,
+		Expires:  expiresAt,
+		Secure:   os.Getenv("ENV") == "production",
+		SameSite: http.SameSiteLaxMode,
+		Path:     "/",
+	})
+
+	http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
 }
 
 func main() {
