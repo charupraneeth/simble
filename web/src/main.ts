@@ -1,6 +1,13 @@
+import './assets/css/main.css'
+
 import { createApp } from 'vue'
 import App from './App.vue'
-import '@knadh/oat/oat.min.css';
-import '@knadh/oat/oat.min.js';
+import router from './router'
+import ui from '@nuxt/ui/vue-plugin'
 
-createApp(App).mount('#app')
+const app = createApp(App)
+
+app.use(router)
+app.use(ui)
+
+app.mount('#app')

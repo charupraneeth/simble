@@ -1,12 +1,10 @@
 <script setup lang="ts">
-const handleGetMe = async ()=>{
-  const response = await fetch("/api/me")
-  const json = await response.json()
-  console.log(json)
-}
+// App base layout
 
 </script>
 
 <template>
-  <button @click="handleGetMe">get me</button>
+  <UApp>
+    <RouterView />
+  </UApp>
 </template>
