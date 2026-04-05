@@ -3,7 +3,6 @@ import { useRouter } from 'vue-router'
 import Globe from '../components/icons/Globe.vue'
 import Plus from '../components/icons/Plus.vue'
 import ExternalLink from '../components/icons/ExternalLink.vue'
-import LogOut from '../components/icons/LogOut.vue'
 
 const router = useRouter()
 
@@ -43,7 +42,8 @@ const sites = [
         </div>
 
         <!-- Globe Icon -->
-        <div class="w-12 h-12 rounded-full bg-gray-800 border border-gray-700 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
+        <div
+          class="w-12 h-12 rounded-full bg-gray-800 border border-gray-700 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
           <Globe class="w-6 h-6 text-emerald-400" />
         </div>
 
