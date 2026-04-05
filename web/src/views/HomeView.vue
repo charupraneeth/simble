@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import GithubIcon from '../assets/icons/github.svg'
+import GitHub from '../components/icons/GitHub.vue'
 import Zap from '../components/icons/Zap.vue'
 import Shield from '../components/icons/Shield.vue'
 import Activity from '../components/icons/Activity.vue'
@@ -36,7 +36,7 @@ const handleGithubLogin = () => {
       <button
         class="inline-flex items-center justify-center gap-2 px-8 py-3 w-full sm:w-auto rounded-lg bg-emerald-500 hover:bg-emerald-400 text-emerald-950 font-bold transition-all shadow-lg shadow-emerald-500/25 group text-base"
         @click="handleGithubLogin">
-        <img :src="GithubIcon" class="w-5 h-5" />
+        <GitHub class="w-5 h-5" />
         Signin with GitHub
       </button>
     </div>

@@ -1,32 +1,73 @@
-<script setup lang="tsx">
-import GithubIcon from '../assets/icons/github.svg'
+<script setup lang="ts">
+import { useRouter } from 'vue-router'
+import { useAuth } from '../composables/useAuth'
+import SimbleLogo from './icons/SimbleLogo.vue'
+import LogOut from './icons/LogOut.vue'
+import GitHub from './icons/GitHub.vue'
+
+const router = useRouter()
+const { user, isLoggedIn } = useAuth()
 
 const handleGithubLogin = () => {
-    window.location.href = `/auth/github`
+  window.location.href = '/auth/github'
 }
+
+const handleSignOut = () => {
+  // TODO: call DELETE /api/session when backend endpoint is ready
+  router.push('/')
+}
+
+// Derive initials for the avatar fallback
+const initials = (username: string) => username.slice(0, 2).toUpperCase()
 </script>
 
 <template>
-    <nav class="container mx-auto px-6 py-6 flex items-center justify-between border-b border-gray-800/50">
-        <div class="flex items-center gap-2">
-            <div class="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
-                    stroke-linejoin="round" class="w-5 h-5 text-white">
-                    <circle cx="4" cy="17" r="2"></circle>
-                    <circle cx="20" cy="7" r="2"></circle>
-                    <path d="M6 17 C 12 17 12 7 18 7"></path>
-                </svg>
+  <nav class="border-b border-gray-800/50 bg-[#02040a]/80 backdrop-blur-md sticky top-0 z-10">
+    <div class="container mx-auto px-6 h-16 flex items-center justify-between">
+
+      <!-- Logo -->
+      <div class="flex items-center gap-2 cursor-pointer" @click="router.push('/')">
+        <div class="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center">
+          <SimbleLogo class="w-5 h-5 text-white" />
+        </div>
+        <span class="text-xl font-bold tracking-tight text-white">simble</span>
+      </div>
+
+      <!-- Right Side -->
+      <div class="flex items-center gap-4">
+
+        <!-- Logged In: Avatar + Username + Sign Out -->
+        <template v-if="isLoggedIn && user">
+          <!-- Avatar -->
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-full bg-emerald-600 flex items-center justify-center text-white text-xs font-bold ring-2 ring-emerald-500/30">
+              {{ initials(user.username) }}
             </div>
-            <span class="text-xl font-bold tracking-tight text-white">simble</span>
-        </div>
-        <div class="flex items-center gap-4">
-            <!-- Start for free Button -->
-            <button
-                class="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-emerald-950 font-bold transition-all"
-                @click="handleGithubLogin">
-                <img :src="GithubIcon" class="w-5 h-5" />
-                Start for free
-            </button>
-        </div>
-    </nav>
+            <span class="text-sm font-medium text-gray-300 hidden sm:block">{{ user.username }}</span>
+          </div>
+
+          <!-- Sign Out -->
+          <button
+            class="flex items-center gap-2 text-sm text-gray-400 hover:text-white transition-colors group"
+            @click="handleSignOut"
+          >
+            <LogOut class="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
+            <span class="hidden sm:block">Sign out</span>
+          </button>
+        </template>
+
+        <!-- Logged Out: GitHub Login Button -->
+        <template v-else>
+          <button
+            class="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-emerald-950 font-bold text-sm transition-all"
+            @click="handleGithubLogin"
+          >
+            <GitHub class="w-4 h-4" />
+            Start for free
+          </button>
+        </template>
+
+      </div>
+    </div>
+  </nav>
 </template>

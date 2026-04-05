@@ -10,6 +10,17 @@ const user = ref<User | null>(null)
 const loading = ref(false)
 const isLoaded = ref(false)
 
+console.log(user)
+
+function transformUser(raw: { username: string; email: string; expires_at: string }): User {
+    return {
+        username: raw.username,
+        email: raw.email || null,
+        expiresAt: new Date(raw.expires_at)
+    }
+}
+
+
 export function useAuth() {
 
     const isLoggedIn = computed(() => !!user.value)
@@ -23,7 +34,7 @@ export function useAuth() {
 
                 const userJSON = await response.json()
 
-                user.value = userJSON
+                user.value = transformUser(userJSON)
             } else {
                 user.value = null
             }
