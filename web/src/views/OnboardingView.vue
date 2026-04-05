@@ -11,6 +11,7 @@ const domain = ref('')
 const step = ref(1)
 const copied = ref(false)
 const isSubmitting = ref(false)
+const submitError = ref('')
 
 const origin = window.location.origin
 
@@ -34,6 +35,7 @@ const handleCopy = async () => {
 
 const submitSite = async () => {
   isSubmitting.value = true
+  submitError.value = ''
   try {
     const response = await fetch('/api/sites', {
       method: 'POST',
@@ -42,13 +44,14 @@ const submitSite = async () => {
     })
 
     if (response.ok) {
-      // Success! Move to installation snippet step
       step.value = 2
+    } else if (response.status === 409) {
+      submitError.value = 'This domain is already registered. Use a different domain or go to your dashboard.'
     } else {
-      console.error("Failed to register site")
+      submitError.value = 'Something went wrong. Please try again.'
     }
   } catch (error) {
-    console.error("Network error:", error)
+    submitError.value = 'Network error. Check your connection and try again.'
   } finally {
     isSubmitting.value = false
   }
@@ -79,8 +82,9 @@ const submitSite = async () => {
         <div class="flex flex-col gap-2">
           <label for="domain" class="text-sm font-medium text-gray-300">Domain name</label>
           <input id="domain" v-model="domain" placeholder="e.g. example.com" autofocus
-            class="bg-gray-950 border border-gray-700 rounded-lg h-12 px-4 text-base text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition-all"
+            :class="['bg-gray-950 border rounded-lg h-12 px-4 text-base text-white focus:ring-2 focus:outline-none transition-all', submitError ? 'border-red-500 focus:ring-red-500' : 'border-gray-700 focus:ring-emerald-500']"
             @keydown.enter="isFormValid && !isSubmitting ? submitSite() : null" />
+          <p v-if="submitError" class="text-xs text-red-400 mt-1">{{ submitError }}</p>
         </div>
 
         <button @click="submitSite" :disabled="!isFormValid || isSubmitting"

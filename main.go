@@ -21,6 +21,7 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/medama-io/go-useragent"
 	"github.com/oschwald/geoip2-golang/v2"
@@ -65,6 +66,7 @@ type Site struct {
 	ID        int64     `json:"id" db:"id"`
 	Domain    string    `json:"domain" db:"domain"`
 	CreatedAt time.Time `json:"created_at" db:"created_at"`
+	Visitors  int64     `json:"visitors" db:"visitors"`
 }
 
 type CreateSitePayload struct {
@@ -454,9 +456,20 @@ func (app *App) handleGetSites(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value(userKey).(User).ID
 
 	query := `
-		select  s.id, s.domain, s.created_at
-		from sites s
-		where s.user_id = $1
+		SELECT
+			s.id,
+			s.domain,
+			s.created_at,
+			COALESCE(live.visitors, 0) AS visitors
+		FROM sites s
+		LEFT JOIN (
+			SELECT site_id, COUNT(DISTINCT visitor_id) AS visitors
+			FROM analytics
+			WHERE created_at > NOW() - INTERVAL '5 minutes'
+			GROUP BY site_id
+		) live ON live.site_id = s.id
+		WHERE s.user_id = $1
+		ORDER BY s.created_at DESC
 	`
 
 	rows, err := app.DB.Query(r.Context(), query, userID)
@@ -472,6 +485,7 @@ func (app *App) handleGetSites(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(sites)
 }
 
@@ -613,10 +627,17 @@ func (app *App) handleCreateSite(w http.ResponseWriter, r *http.Request) {
 	var site Site
 	err := app.DB.QueryRow(r.Context(), query, payload.Domain, userID).Scan(&site.ID, &site.Domain, &site.CreatedAt)
 	if err != nil {
-		http.Error(w, "Failed to create site:", http.StatusInternalServerError)
+		// Check for unique constraint violation (domain already exists)
+		if pgErr, ok := err.(*pgconn.PgError); ok && pgErr.Code == "23505" {
+			http.Error(w, "This domain is already registered", http.StatusConflict)
+			return
+		}
+		log.Printf("handleCreateSite error: %v", err)
+		http.Error(w, "Failed to create site", http.StatusInternalServerError)
 		return
 	}
 
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(site)
 }
 

@@ -10,7 +10,7 @@ const router = useRouter()
 interface Site {
   id: number;
   domain: string;
-  visitors?: number;
+  visitors: number;
 }
 
 const sites = ref<Site[]>([])
