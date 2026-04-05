@@ -3,13 +3,31 @@ import { useRouter } from 'vue-router'
 import Globe from '../components/icons/Globe.vue'
 import Plus from '../components/icons/Plus.vue'
 import ExternalLink from '../components/icons/ExternalLink.vue'
+import { onMounted, ref } from 'vue'
 
 const router = useRouter()
 
-const sites = [
-  { id: 'simble-demo.io', name: 'simble-demo.io', status: 'active', visitors: 12 },
-  { id: 'my-blog.dev', name: 'my-blog.dev', status: 'active', visitors: 3 },
-]
+interface Site {
+  id: number;
+  domain: string;
+  visitors?: number;
+}
+
+const sites = ref<Site[]>([])
+const isLoading = ref(true)
+
+onMounted(async () => {
+  try {
+    const response = await fetch('/api/sites')
+    if (response.ok) {
+      sites.value = await response.json()
+    }
+  } catch (error) {
+    console.error("Failed to load sites:", error)
+  } finally {
+    isLoading.value = false
+  }
+})
 </script>
 
 <template>
@@ -47,9 +65,8 @@ const sites = [
           <Globe class="w-6 h-6 text-emerald-400" />
         </div>
 
-        <!-- Site Name -->
         <h3 class="text-lg font-semibold text-white group-hover:text-emerald-400 transition-colors mb-2">
-          {{ site.name }}
+          {{ site.domain }}
         </h3>
 
         <!-- Live Visitors Badge -->
@@ -58,7 +75,7 @@ const sites = [
             <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
             <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
           </span>
-          <span class="text-gray-300">{{ site.visitors }} current visitors</span>
+          <span class="text-gray-300">{{ site.visitors || 0 }} current visitors</span>
         </div>
       </div>
 

@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
 import SitesListView from '../views/SitesListView.vue'
 import SiteDashboardView from '../views/SiteDashboardView.vue'
+import OnboardingView from '../views/OnboardingView.vue'
 import { useAuth } from '../composables/useAuth'
 
 const router = createRouter({
@@ -16,6 +17,12 @@ const router = createRouter({
       path: '/sites',
       name: 'sitesList',
       component: SitesListView,
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/onboarding',
+      name: 'onboarding',
+      component: OnboardingView,
       meta: { requiresAuth: true }
     },
     {

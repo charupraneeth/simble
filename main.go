@@ -61,6 +61,16 @@ type User struct {
 	ExpiresAt time.Time `json:"expires_at"`
 }
 
+type Site struct {
+	ID        int64     `json:"id" db:"id"`
+	Domain    string    `json:"domain" db:"domain"`
+	CreatedAt time.Time `json:"created_at" db:"created_at"`
+}
+
+type CreateSitePayload struct {
+	Domain string `json:"domain"`
+}
+
 type App struct {
 	GeoDB       *geoip2.Reader
 	UAParser    *useragent.Parser
@@ -424,6 +434,55 @@ func (app *App) handleLogout(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+func (app *App) handleGetSites(w http.ResponseWriter, r *http.Request) {
+	userID := r.Context().Value(userKey).(User).ID
+
+	query := `
+		select  s.id, s.domain, s.created_at
+		from sites s
+		where s.user_id = $1
+	`
+
+	rows, err := app.DB.Query(r.Context(), query, userID)
+	if err != nil {
+		http.Error(w, "Failed to query sites", http.StatusInternalServerError)
+		return
+	}
+
+	sites, err := pgx.CollectRows(rows, pgx.RowToStructByName[Site])
+	if err != nil {
+		log.Printf("pgx CollectRows error: %v", err)
+		http.Error(w, fmt.Sprintf("Failed to map sites: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(sites)
+}
+
+func (app *App) handleCreateSite(w http.ResponseWriter, r *http.Request) {
+	var payload CreateSitePayload
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	userID := r.Context().Value(userKey).(User).ID
+
+	query := `
+		INSERT INTO sites (domain, user_id)
+		VALUES($1, $2)
+		RETURNING id, domain, created_at
+	`
+	var site Site
+	err := app.DB.QueryRow(r.Context(), query, payload.Domain, userID).Scan(&site.ID, &site.Domain, &site.CreatedAt)
+	if err != nil {
+		http.Error(w, "Failed to create site:", http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(site)
+}
+
 func (app *App) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		token, err := r.Cookie("session")
@@ -504,6 +563,9 @@ func main() {
 	mux.HandleFunc("/api/event", app.handleRequest)
 	mux.HandleFunc("GET /api/me", app.requireAuth(app.handleGetMe))
 	mux.HandleFunc("DELETE /api/session", app.requireAuth(app.handleLogout))
+
+	mux.HandleFunc("GET /api/sites", app.requireAuth(app.handleGetSites))
+	mux.HandleFunc("POST /api/sites", app.requireAuth(app.handleCreateSite))
 
 	distFS := http.Dir("./public/dist")
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
