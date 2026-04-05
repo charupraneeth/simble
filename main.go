@@ -71,6 +71,22 @@ type CreateSitePayload struct {
 	Domain string `json:"domain"`
 }
 
+type SiteStats struct {
+	UniqueVisitors int64 `json:"unique_visitors"`
+	Pageviews      int64 `json:"pageviews"`
+}
+
+type TrafficPoint struct {
+	Hour     time.Time `json:"hour"`
+	Visitors int64     `json:"visitors"`
+}
+
+type TopPage struct {
+	Path           string `json:"path"`
+	Views          int64  `json:"views"`
+	UniqueVisitors int64  `json:"unique_visitors"`
+}
+
 type App struct {
 	GeoDB       *geoip2.Reader
 	UAParser    *useragent.Parser
@@ -459,6 +475,127 @@ func (app *App) handleGetSites(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(sites)
 }
 
+func (app *App) handleGetSiteStats(w http.ResponseWriter, r *http.Request) {
+	siteID := r.PathValue("id")
+	userID := r.Context().Value(userKey).(User).ID
+
+	// Verify site belongs to this user
+	var ownerID int64
+	err := app.DB.QueryRow(r.Context(), `SELECT user_id FROM sites WHERE id = $1`, siteID).Scan(&ownerID)
+	if err != nil || ownerID != userID {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+
+	var stats SiteStats
+	err = app.DB.QueryRow(r.Context(), `
+		SELECT
+			COUNT(DISTINCT visitor_id) AS unique_visitors,
+			COUNT(*) AS pageviews
+		FROM analytics
+		WHERE site_id = $1
+		  AND created_at > NOW() - INTERVAL '24 hours'
+	`, siteID).Scan(&stats.UniqueVisitors, &stats.Pageviews)
+	if err != nil {
+		log.Printf("handleGetSiteStats error: %v", err)
+		http.Error(w, "Failed to get stats", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(stats)
+}
+
+func (app *App) handleGetSiteTraffic(w http.ResponseWriter, r *http.Request) {
+	siteID := r.PathValue("id")
+	userID := r.Context().Value(userKey).(User).ID
+
+	var ownerID int64
+	err := app.DB.QueryRow(r.Context(), `SELECT user_id FROM sites WHERE id = $1`, siteID).Scan(&ownerID)
+	if err != nil || ownerID != userID {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+
+	rows, err := app.DB.Query(r.Context(), `
+		SELECT
+			DATE_TRUNC('hour', created_at) AS hour,
+			COUNT(DISTINCT visitor_id) AS visitors
+		FROM analytics
+		WHERE site_id = $1
+		  AND created_at > NOW() - INTERVAL '24 hours'
+		GROUP BY hour
+		ORDER BY hour ASC
+	`, siteID)
+	if err != nil {
+		log.Printf("handleGetSiteTraffic error: %v", err)
+		http.Error(w, "Failed to get traffic", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var points []TrafficPoint
+	for rows.Next() {
+		var p TrafficPoint
+		if err := rows.Scan(&p.Hour, &p.Visitors); err != nil {
+			continue
+		}
+		points = append(points, p)
+	}
+	if points == nil {
+		points = []TrafficPoint{} // return [] not null
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(points)
+}
+
+func (app *App) handleGetSitePages(w http.ResponseWriter, r *http.Request) {
+	siteID := r.PathValue("id")
+	userID := r.Context().Value(userKey).(User).ID
+
+	var ownerID int64
+	err := app.DB.QueryRow(r.Context(), `SELECT user_id FROM sites WHERE id = $1`, siteID).Scan(&ownerID)
+	if err != nil || ownerID != userID {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+
+	rows, err := app.DB.Query(r.Context(), `
+		SELECT
+			path,
+			COUNT(*) AS views,
+			COUNT(DISTINCT visitor_id) AS unique_visitors
+		FROM analytics
+		WHERE site_id = $1
+		  AND created_at > NOW() - INTERVAL '24 hours'
+		GROUP BY path
+		ORDER BY views DESC
+		LIMIT 10
+	`, siteID)
+	if err != nil {
+		log.Printf("handleGetSitePages error: %v", err)
+		http.Error(w, "Failed to get pages", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var pages []TopPage
+	for rows.Next() {
+		var p TopPage
+		if err := rows.Scan(&p.Path, &p.Views, &p.UniqueVisitors); err != nil {
+			continue
+		}
+		pages = append(pages, p)
+	}
+	if pages == nil {
+		pages = []TopPage{}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(pages)
+}
+
 func (app *App) handleCreateSite(w http.ResponseWriter, r *http.Request) {
 	var payload CreateSitePayload
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
@@ -566,6 +703,9 @@ func main() {
 
 	mux.HandleFunc("GET /api/sites", app.requireAuth(app.handleGetSites))
 	mux.HandleFunc("POST /api/sites", app.requireAuth(app.handleCreateSite))
+	mux.HandleFunc("GET /api/sites/{id}/stats", app.requireAuth(app.handleGetSiteStats))
+	mux.HandleFunc("GET /api/sites/{id}/traffic", app.requireAuth(app.handleGetSiteTraffic))
+	mux.HandleFunc("GET /api/sites/{id}/pages", app.requireAuth(app.handleGetSitePages))
 
 	distFS := http.Dir("./public/dist")
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
