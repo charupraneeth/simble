@@ -1,8 +1,6 @@
 <script setup lang="ts">
-import { useRouter } from 'vue-router'
 import GithubIcon from '../assets/icons/github.svg'
 
-const router = useRouter()
 
 const handleGithubLogin = () => {
   window.location.href = `/auth/github`
