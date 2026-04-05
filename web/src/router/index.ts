@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
 import SitesListView from '../views/SitesListView.vue'
 import SiteDashboardView from '../views/SiteDashboardView.vue'
+import { useAuth } from '../composables/useAuth'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -14,15 +15,35 @@ const router = createRouter({
     {
       path: '/sites',
       name: 'sitesList',
-      component: SitesListView
+      component: SitesListView,
+      meta: { requiresAuth: true }
     },
     {
       path: '/sites/:id',
       name: 'siteDashboard',
-      component: SiteDashboardView
+      component: SiteDashboardView,
+      meta: { requiresAuth: true }
     }
   ]
 })
 
+router.beforeEach(async (to) => {
+  const { login, isLoggedIn } = useAuth()
+
+  // Await the login check to guarantee we know their identity before routing
+  await login()
+
+  // Guard 1: Unauthenticated users visiting a secure route
+  if (to.meta.requiresAuth && !isLoggedIn.value) {
+    // Optionally: trigger a toast here if they were kicked out mid-session 
+    // by tracking a previouslyLoggedIn variable.
+    return { name: 'home' } // redirect back to landing
+  }
+
+  // Guard 2: Authenticated users trying to view the public landing page
+  if (to.name === 'home' && isLoggedIn.value) {
+    return { name: 'sitesList' } // kick them cleanly to their dashboard
+  }
+})
 
 export default router
