@@ -6,15 +6,14 @@ import LogOut from './icons/LogOut.vue'
 import GitHub from './icons/GitHub.vue'
 
 const router = useRouter()
-const { user, isLoggedIn } = useAuth()
+const { user, isLoggedIn, logout, loading } = useAuth()
 
 const handleGithubLogin = () => {
   window.location.href = '/auth/github'
 }
 
-const handleSignOut = () => {
-  // TODO: call DELETE /api/session when backend endpoint is ready
-  router.push('/')
+const handleSignOut = async () => {
+  await logout()
 }
 
 // Derive initials for the avatar fallback
@@ -36,21 +35,28 @@ const initials = (username: string) => username.slice(0, 2).toUpperCase()
       <!-- Right Side -->
       <div class="flex items-center gap-4">
 
+        <!-- Loading State -->
+        <template v-if="loading">
+           <svg class="animate-spin h-5 w-5 text-emerald-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+        </template>
+
         <!-- Logged In: Avatar + Username + Sign Out -->
-        <template v-if="isLoggedIn && user">
+        <template v-else-if="isLoggedIn && user">
           <!-- Avatar -->
           <div class="flex items-center gap-3">
-            <div class="w-8 h-8 rounded-full bg-emerald-600 flex items-center justify-center text-white text-xs font-bold ring-2 ring-emerald-500/30">
+            <div
+              class="w-8 h-8 rounded-full bg-emerald-600 flex items-center justify-center text-white text-xs font-bold ring-2 ring-emerald-500/30">
               {{ initials(user.username) }}
             </div>
             <span class="text-sm font-medium text-gray-300 hidden sm:block">{{ user.username }}</span>
           </div>
 
           <!-- Sign Out -->
-          <button
-            class="flex items-center gap-2 text-sm text-gray-400 hover:text-white transition-colors group"
-            @click="handleSignOut"
-          >
+          <button class="flex items-center gap-2 text-sm text-gray-400 hover:text-white transition-colors group"
+            @click="handleSignOut">
             <LogOut class="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
             <span class="hidden sm:block">Sign out</span>
           </button>
@@ -60,8 +66,7 @@ const initials = (username: string) => username.slice(0, 2).toUpperCase()
         <template v-else>
           <button
             class="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-emerald-950 font-bold text-sm transition-all"
-            @click="handleGithubLogin"
-          >
+            @click="handleGithubLogin">
             <GitHub class="w-4 h-4" />
             Start for free
           </button>

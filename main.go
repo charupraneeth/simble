@@ -409,6 +409,37 @@ func (app *App) handleGetMe(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(user)
 }
 
+func (app *App) handleLogout(w http.ResponseWriter, r *http.Request) {
+	token, err := r.Cookie("session")
+	if err != nil {
+		http.Error(w, "Failed to delete user session", http.StatusBadRequest)
+		return
+	}
+
+	query := `
+		DELETE from sessions
+		where token = $1
+	`
+
+	_, err = app.DB.Exec(r.Context(), query, token.Value)
+	if err != nil {
+		http.Error(w, "Failed to remove user session", http.StatusInternalServerError)
+		return
+	}
+
+	// Delete the cookie on the client side by expiring it immediately
+	http.SetCookie(w, &http.Cookie{
+		Name:     "session",
+		Value:    "",
+		HttpOnly: true,
+		MaxAge:   -1,
+		Expires:  time.Now().Add(-100 * time.Hour),
+		Path:     "/",
+	})
+
+	w.WriteHeader(http.StatusOK)
+}
+
 func main() {
 	mux := http.NewServeMux()
 	ctx := context.Background()
@@ -459,6 +490,7 @@ func main() {
 	mux.HandleFunc("GET /auth/github/callback", app.handleGitHubCallback)
 	mux.HandleFunc("/api/event", app.handleRequest)
 	mux.HandleFunc("GET /api/me", app.handleGetMe)
+	mux.HandleFunc("DELETE /api/session", app.handleLogout)
 
 	distFS := http.Dir("./public/dist")
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {

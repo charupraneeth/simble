@@ -1,4 +1,5 @@
 import { computed, ref } from "vue";
+import router from "../router";
 
 export type User = {
     username: string
@@ -47,10 +48,25 @@ export function useAuth() {
         }
     }
 
+    const logout = async () => {
+        try {
+            loading.value = true
+            await fetch("/api/session", { method: 'DELETE' })
+            user.value = null
+            isLoaded.value = false
+            router.push('/')
+        } catch (error) {
+            console.error("Failed to log out:", error)
+        } finally {
+            loading.value = false
+        }
+    }
+
     return {
         user,
         isLoggedIn,
         login,
-        loading
+        loading,
+        logout
     }
 }
