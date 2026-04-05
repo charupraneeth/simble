@@ -55,6 +55,7 @@ type GitHubUser struct {
 }
 
 type User struct {
+	ID        int64     `json:"-"` // Hidden from frontend JSON responses
 	Username  string    `json:"username"`
 	Email     *string   `json:"email"` // this can be null if the user had made it private
 	ExpiresAt time.Time `json:"expires_at"`
@@ -66,6 +67,10 @@ type App struct {
 	DB          *pgxpool.Pool
 	OAuthConfig *oauth2.Config
 }
+
+type contextKey string
+
+const userKey contextKey = "user"
 
 func getRealIP(r *http.Request) string {
 	// Check for X-Forwared-For header
@@ -382,28 +387,7 @@ func (app *App) handleGitHubCallback(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *App) handleGetMe(w http.ResponseWriter, r *http.Request) {
-	token, err := r.Cookie("session")
-	if err != nil {
-		log.Println("Invalid cookie in header")
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
-
-	query := `
-		SELECT u.username, u.email, s.expires_at
-		FROM sessions s
-		JOIN users u ON s.user_id = u.id
-		WHERE s.token  = $1 
-		AND s.expires_at > CURRENT_TIMESTAMP;
-	`
-
-	var user User
-	err = app.DB.QueryRow(r.Context(), query, token.Value).Scan(&user.Username, &user.Email, &user.ExpiresAt)
-	if err != nil {
-		log.Println("Failed to get user with given session token")
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
+	user := r.Context().Value(userKey).(User)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(user)
@@ -438,6 +422,35 @@ func (app *App) handleLogout(w http.ResponseWriter, r *http.Request) {
 	})
 
 	w.WriteHeader(http.StatusOK)
+}
+
+func (app *App) requireAuth(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		token, err := r.Cookie("session")
+		if err != nil {
+			http.Error(w, "Invalid session cookie", http.StatusBadRequest)
+			return
+		}
+
+		query := `
+			SELECT u.id, u.username, u.email, s.expires_at
+			FROM sessions s
+			JOIN users u ON s.user_id = u.id
+			WHERE s.token  = $1 
+			AND s.expires_at > CURRENT_TIMESTAMP;
+		`
+
+		var user User
+		err = app.DB.QueryRow(r.Context(), query, token.Value).Scan(&user.ID, &user.Username, &user.Email, &user.ExpiresAt)
+		if err != nil {
+			log.Println("Failed to get user with given session token")
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		ctx := context.WithValue(r.Context(), userKey, user)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	}
 }
 
 func main() {
@@ -489,8 +502,8 @@ func main() {
 	mux.HandleFunc("GET /auth/github", app.handleGitHubLogin)
 	mux.HandleFunc("GET /auth/github/callback", app.handleGitHubCallback)
 	mux.HandleFunc("/api/event", app.handleRequest)
-	mux.HandleFunc("GET /api/me", app.handleGetMe)
-	mux.HandleFunc("DELETE /api/session", app.handleLogout)
+	mux.HandleFunc("GET /api/me", app.requireAuth(app.handleGetMe))
+	mux.HandleFunc("DELETE /api/session", app.requireAuth(app.handleLogout))
 
 	distFS := http.Dir("./public/dist")
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
