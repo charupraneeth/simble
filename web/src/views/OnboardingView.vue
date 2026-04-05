@@ -12,8 +12,10 @@ const step = ref(1)
 const copied = ref(false)
 const isSubmitting = ref(false)
 
+const origin = window.location.origin
+
 const snippet = computed(() => {
-  return `<script defer data-domain="${domain.value || 'yourdomain.com'}" src="https://simble.io/js/script.js"><\/script>`
+  return `<script defer data-domain="${domain.value || 'yourdomain.com'}" src="${origin}/script.js"><\/script>`
 })
 
 const isFormValid = computed(() => {
