@@ -24,10 +24,12 @@ const siteId = route.params.id as string
 interface Stats { unique_visitors: number; pageviews: number }
 interface TrafficPoint { hour: string; visitors: number }
 interface TopPage { path: string; views: number; unique_visitors: number }
+interface TopCountry { country_code: string; views: number; unique_visitors: number }
 
 const stats = ref<Stats | null>(null)
 const traffic = ref<TrafficPoint[]>([])
 const pages = ref<TopPage[]>([])
+const countries = ref<TopCountry[]>([])
 const domain = ref('')
 const isLoading = ref(true)
 
@@ -42,15 +44,17 @@ onMounted(async () => {
       if (site) domain.value = site.domain
     }
 
-    const [statsRes, trafficRes, pagesRes] = await Promise.all([
+    const [statsRes, trafficRes, pagesRes, countriesRes] = await Promise.all([
       fetch(`/api/sites/${siteId}/stats`),
       fetch(`/api/sites/${siteId}/traffic`),
       fetch(`/api/sites/${siteId}/pages`),
+      fetch(`/api/sites/${siteId}/countries`),
     ])
 
     if (statsRes.ok) stats.value = await statsRes.json()
     if (trafficRes.ok) traffic.value = await trafficRes.json()
     if (pagesRes.ok) pages.value = await pagesRes.json()
+    if (countriesRes.ok) countries.value = await countriesRes.json()
   } catch (e) {
     console.error('Failed to load dashboard data', e)
   } finally {
@@ -176,28 +180,70 @@ const formatNum = (n: number) =>
           </div>
         </div>
 
-        <!-- Top Pages -->
-        <div class="p-6 border border-gray-800 rounded-xl bg-gray-900/60">
-          <h2 class="text-sm font-semibold uppercase tracking-widest text-gray-400 mb-6">Top Pages</h2>
-          <div v-if="pages.length > 0">
-            <div class="grid grid-cols-3 text-xs text-gray-500 uppercase tracking-widest pb-3 border-b border-gray-800 mb-2">
-              <span>Path</span>
-              <span class="text-right">Views</span>
-              <span class="text-right">Unique</span>
+        <!-- Data Tables Row -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          
+          <!-- Top Pages -->
+          <div class="p-6 border border-gray-800 rounded-xl bg-gray-900/60">
+            <h2 class="text-sm font-semibold uppercase tracking-widest text-gray-400 mb-6">Top Pages</h2>
+            <div v-if="pages.length > 0">
+              <div class="grid grid-cols-3 text-xs text-gray-500 uppercase tracking-widest pb-3 border-b border-gray-800 mb-2">
+                <span>Path</span>
+                <span class="text-right">Views</span>
+                <span class="text-right">Unique</span>
+              </div>
+              <div
+                v-for="page in pages"
+                :key="page.path"
+                class="grid grid-cols-3 py-3 border-b border-gray-800/50 text-sm hover:bg-gray-800/30 px-1 rounded transition-colors"
+              >
+                <span class="text-gray-300 font-mono truncate mr-2">{{ page.path }}</span>
+                <span class="text-right text-white font-medium">{{ formatNum(page.views) }}</span>
+                <span class="text-right text-gray-400">{{ formatNum(page.unique_visitors) }}</span>
+              </div>
             </div>
-            <div
-              v-for="page in pages"
-              :key="page.path"
-              class="grid grid-cols-3 py-3 border-b border-gray-800/50 text-sm hover:bg-gray-800/30 px-1 rounded transition-colors"
-            >
-              <span class="text-gray-300 font-mono truncate">{{ page.path }}</span>
-              <span class="text-right text-white font-medium">{{ formatNum(page.views) }}</span>
-              <span class="text-right text-gray-400">{{ formatNum(page.unique_visitors) }}</span>
+            <div v-else class="text-center text-gray-600 text-sm py-8">
+              No page data yet for this period.
             </div>
           </div>
-          <div v-else class="text-center text-gray-600 text-sm py-8">
-            No page data yet for this period.
+
+          <!-- Top Locations -->
+          <div class="p-6 border border-gray-800 rounded-xl bg-gray-900/60">
+            <h2 class="text-sm font-semibold uppercase tracking-widest text-gray-400 mb-6">Top Locations</h2>
+            <div v-if="countries.length > 0">
+              <div class="grid grid-cols-6 text-xs text-gray-500 uppercase tracking-widest pb-3 border-b border-gray-800 mb-2">
+                <span class="col-span-4">Country</span>
+                <span class="text-right">Views</span>
+                <span class="text-right">Unique</span>
+              </div>
+              <div
+                v-for="country in countries"
+                :key="country.country_code"
+                class="relative py-3 border-b border-gray-800/50 text-sm hover:bg-gray-800/30 px-1 rounded transition-colors"
+              >
+                <!-- Percentage Bar Background -->
+                <div 
+                  class="absolute top-0 left-0 h-full bg-emerald-500/10 rounded pointer-events-none" 
+                  :style="{ width: `${(country.unique_visitors / countries[0].unique_visitors) * 100}%` }"
+                ></div>
+
+                <div class="relative grid grid-cols-6 items-center">
+                  <div class="col-span-4 flex items-center gap-3">
+                    <span class="text-lg leading-none" v-if="country.country_code !== 'Unknown'">
+                      {{ String.fromCodePoint(...country.country_code.toUpperCase().split('').map(c => 127397 + c.charCodeAt(0))) }}
+                    </span>
+                    <span class="text-gray-300">{{ country.country_code }}</span>
+                  </div>
+                  <span class="text-right text-white font-medium">{{ formatNum(country.views) }}</span>
+                  <span class="text-right text-gray-400">{{ formatNum(country.unique_visitors) }}</span>
+                </div>
+              </div>
+            </div>
+            <div v-else class="text-center text-gray-600 text-sm py-8">
+              No location data yet for this period.
+            </div>
           </div>
+
         </div>
       </template>
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -85,6 +86,12 @@ type TrafficPoint struct {
 
 type TopPage struct {
 	Path           string `json:"path"`
+	Views          int64  `json:"views"`
+	UniqueVisitors int64  `json:"unique_visitors"`
+}
+
+type TopCountry struct {
+	CountryCode    string `json:"country_code"`
 	Views          int64  `json:"views"`
 	UniqueVisitors int64  `json:"unique_visitors"`
 }
@@ -610,6 +617,58 @@ func (app *App) handleGetSitePages(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(pages)
 }
 
+func (app *App) handleGetSiteCountries(w http.ResponseWriter, r *http.Request) {
+	siteID := r.PathValue("id")
+	userID := r.Context().Value(userKey).(User).ID
+
+	var ownerID int64
+	err := app.DB.QueryRow(r.Context(), `SELECT user_id FROM sites WHERE id = $1`, siteID).Scan(&ownerID)
+	if err != nil || ownerID != userID {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+
+	rows, err := app.DB.Query(r.Context(), `
+		SELECT
+			COALESCE(country_code, 'Unknown') AS country_code,
+			COUNT(*) AS views,
+			COUNT(DISTINCT visitor_id) AS unique_visitors
+		FROM analytics
+		WHERE site_id = $1
+		  AND created_at > NOW() - INTERVAL '24 hours'
+		GROUP BY country_code
+		ORDER BY unique_visitors DESC
+		LIMIT 10
+	`, siteID)
+	if err != nil {
+		log.Printf("handleGetSiteCountries error: %v", err)
+		http.Error(w, "Failed to get countries", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var countries []TopCountry
+	for rows.Next() {
+		var c TopCountry
+		var cc sql.NullString
+		if err := rows.Scan(&cc, &c.Views, &c.UniqueVisitors); err != nil {
+			continue
+		}
+		if cc.Valid && cc.String != "" {
+			c.CountryCode = cc.String
+		} else {
+			c.CountryCode = "Unknown"
+		}
+		countries = append(countries, c)
+	}
+	if countries == nil {
+		countries = []TopCountry{}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(countries)
+}
+
 func (app *App) handleCreateSite(w http.ResponseWriter, r *http.Request) {
 	var payload CreateSitePayload
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
@@ -727,6 +786,7 @@ func main() {
 	mux.HandleFunc("GET /api/sites/{id}/stats", app.requireAuth(app.handleGetSiteStats))
 	mux.HandleFunc("GET /api/sites/{id}/traffic", app.requireAuth(app.handleGetSiteTraffic))
 	mux.HandleFunc("GET /api/sites/{id}/pages", app.requireAuth(app.handleGetSitePages))
+	mux.HandleFunc("GET /api/sites/{id}/countries", app.requireAuth(app.handleGetSiteCountries))
 
 	distFS := http.Dir("./public/dist")
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
