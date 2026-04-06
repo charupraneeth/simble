@@ -2,13 +2,15 @@
 
 **simble** is a lightweight, privacy-friendly, open-source web analytics platform. Built for developers who want a simple, clean, and fast dashboard to track their website traffic without compromising user privacy.
 
+![simble Dashboard Preview](web/src/assets/dashboard-preview.png)
+
 ## Features
 
 - **Privacy-First:** Lightweight tracking that respects users.
 - **Fast and Simple Dashboard:** Beautiful, responsive UI built with Vue 3, Tailwind CSS, and Chart.js.
 - **GitHub Authentication:** Secure, one-click OAuth login.
 - **Self-Hostable:** Easy deployment to platforms like [Railway](https://railway.app/).
-- **Tiny Tracking Script:** Drop-in `<script>` tag that stays out of your way.
+- **Tiny Tracking Script:** Drop-in `<script>` tag under 1KB that stays out of your way.
 
 ## Tech Stack
 
@@ -80,7 +82,7 @@ simble is designed to be easily deployed to Railway:
 Once deployed, simply copy the tracking snippet provided during the site onboarding flow into your website's `<head>`:
 
 ```html
-<script defer data-domain="yourdomain.com" src="https://your-simble-domain.com/script.js"></script>
+<script defer data-domain="yourdomain.com" src="https://simble.dev/script.js"></script>
 ```
 
 ---
