@@ -95,8 +95,11 @@ const handleGithubLogin = () => {
 
     </div>
 
-    <footer class="w-full text-center py-12 text-gray-500 text-sm">
-      <p>Simble Analytics. Open source and self-hostable.</p>
+    <footer class="w-full flex flex-col items-center justify-center gap-4 py-12 text-gray-500 text-sm">
+      <div class="px-2.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold uppercase tracking-wider">
+        Public Beta
+      </div>
+      <p>Simble Analytics. Open source and self-hostable. More features coming soon!</p>
     </footer>
   </main>
 </template>
