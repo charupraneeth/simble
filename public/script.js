@@ -4,7 +4,7 @@
     const domain = scriptTag.getAttribute('data-domain');
 
     // 2. Send the analytics hit
-    fetch("https://simble.up.railway.app/api/event", {
+    fetch("https://simble.dev/api/event", {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
