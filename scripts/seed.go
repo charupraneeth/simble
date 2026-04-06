@@ -75,54 +75,63 @@ func main() {
 
 	// We'll generate a realistic-ish wave pattern
 	// Visitor ids will be reused some of the time to simulate return visitors
-	var visitorIDs []string
-	for i := 0; i < 2000; i++ {
-		visitorIDs = append(visitorIDs, randomVisitorID())
+	var referrers = []string{
+		"https://google.com", "https://google.com", "https://google.com", 
+		"https://news.ycombinator.com", "https://news.ycombinator.com",
+		"https://twitter.com", "https://reddit.com", "https://github.com",
+		"https://dev.to", "Android App", "", "", "",
 	}
 
-	for i := 0; i < eventsToGenerate; i++ {
-		// Time logic: mostly recent, with less traffic in the past, plus some daily wave structure (sine wave)
+	for i := 0; i < eventsToGenerate; {
 		daysAgo := float64(daysToGenerate) * rand.Float64()
 		timeOffsetHours := daysAgo * 24.0
 
-		// Adds a daily peak at noon
-		wave := math.Sin((timeOffsetHours/24.0 - 0.5) * math.Pi * 2) // -1 to 1
-		// bias traffic towards the "wave peak" by adjusting probability (quick and dirty hack)
+		wave := math.Sin((timeOffsetHours/24.0 - 0.5) * math.Pi * 2) 
 		if rand.Float64() > (wave+1.0)/3.0 {
-			continue // skip this random point, try again
+			continue 
 		}
 
-		eventTime := now.Add(-time.Duration(timeOffsetHours*float64(time.Hour)))
-
-		// 80% new visitors, 20% returning
+		// Create a "session" of 1 to 6 pageviews for a single visitor
+		sessionViews := rand.IntN(6) + 1
 		vid := randomVisitorID()
-		if rand.Float64() < 0.2 {
-			vid = visitorIDs[rand.IntN(len(visitorIDs))]
-		}
-
-		path := paths[rand.IntN(len(paths))]
 		browser := browsers[rand.IntN(len(browsers))]
 		device := devices[rand.IntN(len(devices))]
 		osName := osNames[rand.IntN(len(osNames))]
 		country := countries[rand.IntN(len(countries))]
 		referrer := referrers[rand.IntN(len(referrers))]
 
-		batch.Queue(
-			"INSERT INTO analytics (site_id, visitor_id, path, browser_name, device_type, os_name, country_code, city_name, referrer, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
-			siteID, vid, path, browser, device, osName, country, "City", referrer, eventTime,
-		)
-
-		inserted++
-
-		if inserted%batchSize == 0 {
-			br := conn.SendBatch(ctx, batch)
-			_, err = br.Exec()
-			if err != nil {
-				log.Fatalf("Batch insert failed: %v", err)
+		for v := 0; v < sessionViews && i < eventsToGenerate; v++ {
+			// Events in a session happen a few seconds/minutes apart
+			eventTime := now.Add(-time.Duration(timeOffsetHours*float64(time.Hour))).Add(time.Duration(v * 45) * time.Second)
+			
+			// Usually people land on / or /blog, then click around
+			path := paths[rand.IntN(len(paths))]
+			if v == 0 {
+				// first arrival path
+				path = paths[rand.IntN(2)] 
+			} else {
+				// subsequent views are internal, so referrer drops, but our DB stores it per event.
+				// realistically we should set internal referrer, but for the dashboard it's fine.
 			}
-			br.Close()
-			batch = &pgx.Batch{}
-			fmt.Printf("Inserted %d events...\n", inserted)
+
+			batch.Queue(
+				"INSERT INTO analytics (site_id, visitor_id, path, browser_name, device_type, os_name, country_code, city_name, referrer, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
+				siteID, vid, path, browser, device, osName, country, "City", referrer, eventTime,
+			)
+
+			inserted++
+			i++
+
+			if inserted%batchSize == 0 {
+				br := conn.SendBatch(ctx, batch)
+				_, err = br.Exec()
+				if err != nil {
+					log.Fatalf("Batch insert failed: %v", err)
+				}
+				br.Close()
+				batch = &pgx.Batch{}
+				fmt.Printf("Inserted %d events...\n", inserted)
+			}
 		}
 	}
 

@@ -96,6 +96,12 @@ type TopCountry struct {
 	UniqueVisitors int64  `json:"unique_visitors"`
 }
 
+type TopReferrer struct {
+	Referrer       string `json:"referrer"`
+	Views          int64  `json:"views"`
+	UniqueVisitors int64  `json:"unique_visitors"`
+}
+
 type App struct {
 	GeoDB       *geoip2.Reader
 	UAParser    *useragent.Parser
@@ -690,6 +696,61 @@ func (app *App) handleGetSiteCountries(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(countries)
 }
 
+func (app *App) handleGetSiteReferrers(w http.ResponseWriter, r *http.Request) {
+	siteID := r.PathValue("id")
+	userID := r.Context().Value(userKey).(User).ID
+
+	var ownerID int64
+	err := app.DB.QueryRow(r.Context(), `SELECT user_id FROM sites WHERE id = $1`, siteID).Scan(&ownerID)
+	if err != nil || ownerID != userID {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+
+	interval, _ := parseDateRange(r)
+
+	rows, err := app.DB.Query(r.Context(), fmt.Sprintf(`
+		SELECT
+			COALESCE(NULLIF(referrer, ''), 'Direct / None') AS referrer,
+			COUNT(*) AS views,
+			COUNT(DISTINCT visitor_id) AS unique_visitors
+		FROM analytics
+		WHERE site_id = $1
+		  AND created_at > NOW() - INTERVAL '%s'
+		GROUP BY 1
+		ORDER BY unique_visitors DESC
+		LIMIT 10
+	`, interval), siteID)
+	if err != nil {
+		log.Printf("handleGetSiteReferrers error: %v", err)
+		http.Error(w, "Failed to get referrers", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var referrers []TopReferrer
+	for rows.Next() {
+		var ref TopReferrer
+		if err := rows.Scan(&ref.Referrer, &ref.Views, &ref.UniqueVisitors); err != nil {
+			continue
+		}
+		// Clean up common URL formats simply for display
+		if ref.Referrer != "Direct / None" {
+			ref.Referrer = strings.TrimPrefix(ref.Referrer, "https://")
+			ref.Referrer = strings.TrimPrefix(ref.Referrer, "http://")
+			ref.Referrer = strings.TrimSuffix(ref.Referrer, "/")
+		}
+
+		referrers = append(referrers, ref)
+	}
+	if referrers == nil {
+		referrers = []TopReferrer{}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(referrers)
+}
+
 func (app *App) handleCreateSite(w http.ResponseWriter, r *http.Request) {
 	var payload CreateSitePayload
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
@@ -808,6 +869,7 @@ func main() {
 	mux.HandleFunc("GET /api/sites/{id}/traffic", app.requireAuth(app.handleGetSiteTraffic))
 	mux.HandleFunc("GET /api/sites/{id}/pages", app.requireAuth(app.handleGetSitePages))
 	mux.HandleFunc("GET /api/sites/{id}/countries", app.requireAuth(app.handleGetSiteCountries))
+	mux.HandleFunc("GET /api/sites/{id}/referrers", app.requireAuth(app.handleGetSiteReferrers))
 
 	distFS := http.Dir("./public/dist")
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {

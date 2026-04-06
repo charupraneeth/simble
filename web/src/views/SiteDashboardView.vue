@@ -25,11 +25,13 @@ interface Stats { unique_visitors: number; pageviews: number }
 interface TrafficPoint { hour: string; visitors: number }
 interface TopPage { path: string; views: number; unique_visitors: number }
 interface TopCountry { country_code: string; views: number; unique_visitors: number }
+interface TopReferrer { referrer: string; views: number; unique_visitors: number }
 
 const stats = ref<Stats | null>(null)
 const traffic = ref<TrafficPoint[]>([])
 const pages = ref<TopPage[]>([])
 const countries = ref<TopCountry[]>([])
+const referrers = ref<TopReferrer[]>([])
 const domain = ref('')
 const isLoading = ref(true)
 const range = ref<'24h' | '7d' | '30d'>('7d')
@@ -44,16 +46,18 @@ const RANGES: { label: string; value: '24h' | '7d' | '30d' }[] = [
 async function fetchData(r: string) {
   isLoading.value = true
   try {
-    const [statsRes, trafficRes, pagesRes, countriesRes] = await Promise.all([
+    const [statsRes, trafficRes, pagesRes, countriesRes, referrersRes] = await Promise.all([
       fetch(`/api/sites/${siteId}/stats?range=${r}`),
       fetch(`/api/sites/${siteId}/traffic?range=${r}`),
       fetch(`/api/sites/${siteId}/pages?range=${r}`),
       fetch(`/api/sites/${siteId}/countries?range=${r}`),
+      fetch(`/api/sites/${siteId}/referrers?range=${r}`),
     ])
     if (statsRes.ok) stats.value = await statsRes.json()
     if (trafficRes.ok) traffic.value = await trafficRes.json()
     if (pagesRes.ok) pages.value = await pagesRes.json()
     if (countriesRes.ok) countries.value = await countriesRes.json()
+    if (referrersRes.ok) referrers.value = await referrersRes.json()
   } catch (e) {
     console.error('Failed to load dashboard data', e)
   } finally {
@@ -218,7 +222,7 @@ const formatNum = (n: number) =>
         </div>
 
         <!-- Data Tables Row -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
           <!-- Top Pages -->
           <div class="p-6 border border-gray-800 rounded-xl bg-gray-900/60">
@@ -278,6 +282,30 @@ const formatNum = (n: number) =>
             </div>
             <div v-else class="text-center text-gray-600 text-sm py-8">
               No location data yet for this period.
+            </div>
+          </div>
+
+          <!-- Top Referrers -->
+          <div class="p-6 border border-gray-800 rounded-xl bg-gray-900/60">
+            <h2 class="text-sm font-semibold uppercase tracking-widest text-gray-400 mb-6">Top Referrers</h2>
+            <div v-if="referrers.length > 0">
+              <div class="grid grid-cols-3 text-xs text-gray-500 uppercase tracking-widest pb-3 border-b border-gray-800 mb-2">
+                <span>Source</span>
+                <span class="text-right">Views</span>
+                <span class="text-right">Unique</span>
+              </div>
+              <div
+                v-for="ref in referrers"
+                :key="ref.referrer"
+                class="grid grid-cols-3 py-3 border-b border-gray-800/50 text-sm hover:bg-gray-800/30 px-1 rounded transition-colors"
+              >
+                <span class="text-gray-300 truncate mr-2">{{ ref.referrer }}</span>
+                <span class="text-right text-white font-medium">{{ formatNum(ref.views) }}</span>
+                <span class="text-right text-gray-400">{{ formatNum(ref.unique_visitors) }}</span>
+              </div>
+            </div>
+            <div v-else class="text-center text-gray-600 text-sm py-8">
+              No referrer data yet for this period.
             </div>
           </div>
 
