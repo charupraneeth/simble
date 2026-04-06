@@ -31,7 +31,7 @@ const handleGithubLogin = () => {
     <!-- Subheadline -->
     <p class="text-lg md:text-xl text-gray-400 mb-10 max-w-2xl leading-relaxed">
       A radically minimal, ultra-fast alternative to Google Analytics.
-      No cookies, no GDPR banners, and a tracking script under 3KB.
+      No cookies, no GDPR banners, and a tracking script under 1KB.
     </p>
 
     <!-- Buttons -->
