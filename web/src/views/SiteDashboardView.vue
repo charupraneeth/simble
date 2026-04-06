@@ -32,25 +32,24 @@ const pages = ref<TopPage[]>([])
 const countries = ref<TopCountry[]>([])
 const domain = ref('')
 const isLoading = ref(true)
+const range = ref<'24h' | '7d' | '30d'>('7d')
+
+const RANGES: { label: string; value: '24h' | '7d' | '30d' }[] = [
+  { label: '24h', value: '24h' },
+  { label: '7d', value: '7d' },
+  { label: '30d', value: '30d' },
+]
 
 // --- Data fetch ---
-onMounted(async () => {
+async function fetchData(r: string) {
+  isLoading.value = true
   try {
-    // Fetch domain name from sites list
-    const sitesRes = await fetch('/api/sites')
-    if (sitesRes.ok) {
-      const sites = await sitesRes.json()
-      const site = sites.find((s: { id: number }) => String(s.id) === siteId)
-      if (site) domain.value = site.domain
-    }
-
     const [statsRes, trafficRes, pagesRes, countriesRes] = await Promise.all([
-      fetch(`/api/sites/${siteId}/stats`),
-      fetch(`/api/sites/${siteId}/traffic`),
-      fetch(`/api/sites/${siteId}/pages`),
-      fetch(`/api/sites/${siteId}/countries`),
+      fetch(`/api/sites/${siteId}/stats?range=${r}`),
+      fetch(`/api/sites/${siteId}/traffic?range=${r}`),
+      fetch(`/api/sites/${siteId}/pages?range=${r}`),
+      fetch(`/api/sites/${siteId}/countries?range=${r}`),
     ])
-
     if (statsRes.ok) stats.value = await statsRes.json()
     if (trafficRes.ok) traffic.value = await trafficRes.json()
     if (pagesRes.ok) pages.value = await pagesRes.json()
@@ -60,13 +59,32 @@ onMounted(async () => {
   } finally {
     isLoading.value = false
   }
+}
+
+function setRange(r: '24h' | '7d' | '30d') {
+  range.value = r
+  fetchData(r)
+}
+
+onMounted(async () => {
+  // Fetch site domain
+  const sitesRes = await fetch('/api/sites')
+  if (sitesRes.ok) {
+    const sites = await sitesRes.json()
+    const site = sites.find((s: { id: number }) => String(s.id) === siteId)
+    if (site) domain.value = site.domain
+  }
+  fetchData(range.value)
 })
 
 // --- Chart.js config ---
 const chartData = computed<ChartData<'line'>>(() => ({
   labels: traffic.value.map((p) => {
     const d = new Date(p.hour)
-    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    if (range.value === '24h') {
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    }
+    return d.toLocaleDateString([], { month: 'short', day: 'numeric' })
   }),
   datasets: [
     {
@@ -118,7 +136,7 @@ const formatNum = (n: number) =>
     <main class="container mx-auto px-6 py-12 max-w-6xl">
 
       <!-- Header -->
-      <div class="flex items-center justify-between mb-8">
+      <div class="flex items-start justify-between mb-8 gap-4">
         <div>
           <button
             class="text-sm text-gray-500 hover:text-gray-300 transition-colors mb-2 flex items-center gap-1"
@@ -127,7 +145,26 @@ const formatNum = (n: number) =>
             ← Back to Sites
           </button>
           <h1 class="text-2xl font-bold text-white">{{ domain || `Site #${siteId}` }}</h1>
-          <p class="text-xs text-gray-500 mt-1 uppercase tracking-widest">Last 24 hours</p>
+          <p class="text-xs text-gray-500 mt-1 uppercase tracking-widest">
+            Last {{ range === '24h' ? '24 hours' : range === '7d' ? '7 days' : '30 days' }}
+          </p>
+        </div>
+
+        <!-- Range Toggle -->
+        <div class="flex items-center gap-1 bg-gray-900 border border-gray-800 rounded-lg p-1 mt-6">
+          <button
+            v-for="r in RANGES"
+            :key="r.value"
+            @click="setRange(r.value)"
+            :class="[
+              'px-3 py-1.5 rounded-md text-xs font-semibold transition-all',
+              range === r.value
+                ? 'bg-emerald-600 text-white shadow'
+                : 'text-gray-500 hover:text-gray-300'
+            ]"
+          >
+            {{ r.label }}
+          </button>
         </div>
       </div>
 

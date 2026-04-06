@@ -496,11 +496,24 @@ func (app *App) handleGetSites(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(sites)
 }
 
+// parseDateRange reads the ?range= query param and returns a Postgres interval
+// string and a truncation unit for GROUP BY queries.
+// Supported values: "24h" (default), "7d", "30d".
+func parseDateRange(r *http.Request) (interval string, trunc string) {
+	switch r.URL.Query().Get("range") {
+	case "7d":
+		return "7 days", "day"
+	case "30d":
+		return "30 days", "day"
+	default:
+		return "24 hours", "hour"
+	}
+}
+
 func (app *App) handleGetSiteStats(w http.ResponseWriter, r *http.Request) {
 	siteID := r.PathValue("id")
 	userID := r.Context().Value(userKey).(User).ID
 
-	// Verify site belongs to this user
 	var ownerID int64
 	err := app.DB.QueryRow(r.Context(), `SELECT user_id FROM sites WHERE id = $1`, siteID).Scan(&ownerID)
 	if err != nil || ownerID != userID {
@@ -508,15 +521,17 @@ func (app *App) handleGetSiteStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	interval, _ := parseDateRange(r)
+
 	var stats SiteStats
-	err = app.DB.QueryRow(r.Context(), `
+	err = app.DB.QueryRow(r.Context(), fmt.Sprintf(`
 		SELECT
 			COUNT(DISTINCT visitor_id) AS unique_visitors,
 			COUNT(*) AS pageviews
 		FROM analytics
 		WHERE site_id = $1
-		  AND created_at > NOW() - INTERVAL '24 hours'
-	`, siteID).Scan(&stats.UniqueVisitors, &stats.Pageviews)
+		  AND created_at > NOW() - INTERVAL '%s'
+	`, interval), siteID).Scan(&stats.UniqueVisitors, &stats.Pageviews)
 	if err != nil {
 		log.Printf("handleGetSiteStats error: %v", err)
 		http.Error(w, "Failed to get stats", http.StatusInternalServerError)
@@ -538,16 +553,18 @@ func (app *App) handleGetSiteTraffic(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rows, err := app.DB.Query(r.Context(), `
+	interval, trunc := parseDateRange(r)
+
+	rows, err := app.DB.Query(r.Context(), fmt.Sprintf(`
 		SELECT
-			DATE_TRUNC('hour', created_at) AS hour,
+			DATE_TRUNC('%s', created_at) AS hour,
 			COUNT(DISTINCT visitor_id) AS visitors
 		FROM analytics
 		WHERE site_id = $1
-		  AND created_at > NOW() - INTERVAL '24 hours'
+		  AND created_at > NOW() - INTERVAL '%s'
 		GROUP BY hour
 		ORDER BY hour ASC
-	`, siteID)
+	`, trunc, interval), siteID)
 	if err != nil {
 		log.Printf("handleGetSiteTraffic error: %v", err)
 		http.Error(w, "Failed to get traffic", http.StatusInternalServerError)
@@ -582,18 +599,20 @@ func (app *App) handleGetSitePages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rows, err := app.DB.Query(r.Context(), `
+	interval, _ := parseDateRange(r)
+
+	rows, err := app.DB.Query(r.Context(), fmt.Sprintf(`
 		SELECT
 			path,
 			COUNT(*) AS views,
 			COUNT(DISTINCT visitor_id) AS unique_visitors
 		FROM analytics
 		WHERE site_id = $1
-		  AND created_at > NOW() - INTERVAL '24 hours'
+		  AND created_at > NOW() - INTERVAL '%s'
 		GROUP BY path
 		ORDER BY views DESC
 		LIMIT 10
-	`, siteID)
+	`, interval), siteID)
 	if err != nil {
 		log.Printf("handleGetSitePages error: %v", err)
 		http.Error(w, "Failed to get pages", http.StatusInternalServerError)
@@ -628,18 +647,20 @@ func (app *App) handleGetSiteCountries(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rows, err := app.DB.Query(r.Context(), `
+	interval, _ := parseDateRange(r)
+
+	rows, err := app.DB.Query(r.Context(), fmt.Sprintf(`
 		SELECT
 			COALESCE(country_code, 'Unknown') AS country_code,
 			COUNT(*) AS views,
 			COUNT(DISTINCT visitor_id) AS unique_visitors
 		FROM analytics
 		WHERE site_id = $1
-		  AND created_at > NOW() - INTERVAL '24 hours'
+		  AND created_at > NOW() - INTERVAL '%s'
 		GROUP BY country_code
 		ORDER BY unique_visitors DESC
 		LIMIT 10
-	`, siteID)
+	`, interval), siteID)
 	if err != nil {
 		log.Printf("handleGetSiteCountries error: %v", err)
 		http.Error(w, "Failed to get countries", http.StatusInternalServerError)
