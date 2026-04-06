@@ -1,0 +1,1 @@
+ALTER TABLE analytics DROP COLUMN IF EXISTS referrer;
