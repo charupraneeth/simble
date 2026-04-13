@@ -23,9 +23,9 @@ const handleGithubLogin = () => {
     </div>
 
     <!-- Headline -->
-    <h1 class="text-5xl md:text-7xl font-extrabold tracking-tight text-white mb-6 max-w-4xl">
-      Analytics so simple, <br />
-      <span class="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400">it's simble.</span>
+    <h1 class="text-5xl md:text-7xl font-extrabold tracking-tight text-white mb-6 max-w-4xl leading-tight">
+      Analytics so simple, <br class="hidden sm:block" />
+      <span class="inline-block mt-2 md:mt-4 text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400 drop-shadow-[0_0_15px_rgba(52,211,153,0.3)]">it's simble.</span>
     </h1>
 
     <!-- Subheadline -->
@@ -43,19 +43,24 @@ const handleGithubLogin = () => {
         Sign in with GitHub
       </button>
       <a href="/demo"
-        class="inline-flex items-center justify-center gap-2 px-8 py-3 w-full sm:w-auto rounded-lg bg-gray-800 hover:bg-gray-700 text-white font-medium transition-all text-base border border-gray-700">
-        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse inline-block"></span>
+        class="inline-flex items-center justify-center gap-2 px-8 py-3 w-full sm:w-auto rounded-lg bg-gray-800 text-white font-medium transition-all duration-300 text-base border border-gray-700 hover:bg-gray-800/80 hover:border-emerald-500/40 hover:text-emerald-400 hover:shadow-[0_0_20px_rgba(16,185,129,0.1)]">
+        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse inline-block group-hover:bg-emerald-400"></span>
         Live Demo
       </a>
     </div>
 
     <!-- Hero Screenshot -->
-    <div
-      class="w-full max-w-5xl mx-auto rounded-xl lg:rounded-2xl border border-gray-800/60 bg-gray-900/50 p-2 lg:p-4 shadow-2xl overflow-hidden mb-24 relative group">
-      <div class="absolute inset-0 bg-gradient-to-b from-emerald-500/5 to-transparent pointer-events-none"></div>
-      <img :src="DashboardPreview" alt="Simble Dashboard Preview"
-        class="w-full h-auto rounded flex items-center justify-center bg-gray-950 min-h-[400px] text-gray-600 text-sm object-cover"
-        onerror="this.outerHTML='<div class=\'w-full h-[400px] rounded bg-gray-950 flex items-center justify-center border border-dashed border-gray-800 text-gray-500\'>Dashboard preview</div>'" />
+    <div class="relative w-full max-w-5xl mx-auto mb-24">
+      <!-- Glow Blob -->
+      <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[80%] h-[60%] bg-emerald-500/15 blur-[100px] rounded-full pointer-events-none"></div>
+
+      <!-- Image container -->
+      <div class="relative rounded-xl lg:rounded-2xl border border-gray-800/60 bg-gray-900/50 p-2 lg:p-4 shadow-2xl overflow-hidden group">
+        <div class="absolute inset-0 bg-gradient-to-b from-emerald-500/5 to-transparent pointer-events-none"></div>
+        <img :src="DashboardPreview" alt="Simble Dashboard Preview"
+          class="w-full h-auto rounded flex items-center justify-center bg-gray-950 min-h-[400px] text-gray-600 text-sm object-cover relative z-10"
+          onerror="this.outerHTML='<div class=\'w-full h-[400px] rounded bg-gray-950 flex items-center justify-center border border-dashed border-gray-800 text-gray-500 relative z-10\'>Dashboard preview</div>'" />
+      </div>
     </div>
 
     <!-- Feature Cards Grid -->
@@ -63,8 +68,8 @@ const handleGithubLogin = () => {
 
       <!-- Card 1 -->
       <div
-        class="p-6 rounded-2xl bg-gray-900/40 border border-gray-800 hover:border-gray-700 transition-colors flex flex-col gap-4">
-        <div class="w-12 h-12 rounded-xl bg-gray-800 flex items-center justify-center border border-gray-700/50">
+        class="group p-6 rounded-2xl bg-gray-900/40 border border-gray-800 hover:border-gray-700 hover:-translate-y-1 hover:shadow-xl hover:shadow-emerald-900/10 transition-all duration-300 flex flex-col gap-4">
+        <div class="w-12 h-12 rounded-xl bg-gray-800 flex items-center justify-center border border-gray-700/50 group-hover:border-yellow-500/30 group-hover:bg-gray-800/80 transition-colors">
           <Zap class="w-6 h-6 text-yellow-400" />
         </div>
         <h3 class="text-xl font-semibold text-white">Insanely Fast</h3>
@@ -74,8 +79,8 @@ const handleGithubLogin = () => {
 
       <!-- Card 2 -->
       <div
-        class="p-6 rounded-2xl bg-gray-900/40 border border-gray-800 hover:border-gray-700 transition-colors flex flex-col gap-4">
-        <div class="w-12 h-12 rounded-xl bg-gray-800 flex items-center justify-center border border-gray-700/50">
+        class="group p-6 rounded-2xl bg-gray-900/40 border border-gray-800 hover:border-gray-700 hover:-translate-y-1 hover:shadow-xl hover:shadow-emerald-900/10 transition-all duration-300 flex flex-col gap-4">
+        <div class="w-12 h-12 rounded-xl bg-gray-800 flex items-center justify-center border border-gray-700/50 group-hover:border-emerald-500/30 group-hover:bg-gray-800/80 transition-colors">
           <Shield class="w-6 h-6 text-emerald-400" />
         </div>
         <h3 class="text-xl font-semibold text-white">No Cookies</h3>
@@ -85,8 +90,8 @@ const handleGithubLogin = () => {
 
       <!-- Card 3 -->
       <div
-        class="p-6 rounded-2xl bg-gray-900/40 border border-gray-800 hover:border-gray-700 transition-colors flex flex-col gap-4">
-        <div class="w-12 h-12 rounded-xl bg-gray-800 flex items-center justify-center border border-gray-700/50">
+        class="group p-6 rounded-2xl bg-gray-900/40 border border-gray-800 hover:border-gray-700 hover:-translate-y-1 hover:shadow-xl hover:shadow-emerald-900/10 transition-all duration-300 flex flex-col gap-4">
+        <div class="w-12 h-12 rounded-xl bg-gray-800 flex items-center justify-center border border-gray-700/50 group-hover:border-cyan-500/30 group-hover:bg-gray-800/80 transition-colors">
           <Activity class="w-6 h-6 text-cyan-400" />
         </div>
         <h3 class="text-xl font-semibold text-white">Actionable Insights</h3>
@@ -97,10 +102,16 @@ const handleGithubLogin = () => {
     </div>
 
     <footer class="w-full flex flex-col items-center justify-center gap-4 py-12 text-gray-500 text-sm">
-      <div class="px-2.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold uppercase tracking-wider">
+      <div
+        class="px-2.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold uppercase tracking-wider">
         Public Beta
       </div>
       <p>Simble Analytics. Open source and self-hostable. More features coming soon!</p>
+      <a href="https://github.com/charupraneeth/simble" target="_blank" rel="noopener noreferrer"
+        class="inline-flex items-center gap-2 text-gray-500 hover:text-white transition-colors text-xs">
+        <GitHub class="w-4 h-4" />
+        Star us on GitHub
+      </a>
     </footer>
   </main>
 </template>

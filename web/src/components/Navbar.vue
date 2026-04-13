@@ -64,10 +64,18 @@ const initials = (username: string) => username.slice(0, 2).toUpperCase()
 
         <!-- Logged Out: GitHub Login Button -->
         <template v-else>
+          <a
+            href="https://github.com/charupraneeth/simble"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="text-gray-400 hover:text-white transition-colors"
+            title="Star on GitHub"
+          >
+            <GitHub class="w-5 h-5" />
+          </a>
           <button
             class="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-emerald-950 font-bold text-sm transition-all"
             @click="handleGithubLogin">
-            <GitHub class="w-4 h-4" />
             Start for free
           </button>
         </template>
