@@ -107,6 +107,7 @@ type App struct {
 	UAParser    *useragent.Parser
 	DB          *pgxpool.Pool
 	OAuthConfig *oauth2.Config
+	DemoSiteID  string
 }
 
 type contextKey string
@@ -516,21 +517,10 @@ func parseDateRange(r *http.Request) (interval string, trunc string) {
 	}
 }
 
-func (app *App) handleGetSiteStats(w http.ResponseWriter, r *http.Request) {
-	siteID := r.PathValue("id")
-	userID := r.Context().Value(userKey).(User).ID
-
-	var ownerID int64
-	err := app.DB.QueryRow(r.Context(), `SELECT user_id FROM sites WHERE id = $1`, siteID).Scan(&ownerID)
-	if err != nil || ownerID != userID {
-		http.Error(w, "Not found", http.StatusNotFound)
-		return
-	}
-
+func (app *App) serveStats(w http.ResponseWriter, r *http.Request, siteID string) {
 	interval, _ := parseDateRange(r)
-
 	var stats SiteStats
-	err = app.DB.QueryRow(r.Context(), fmt.Sprintf(`
+	err := app.DB.QueryRow(r.Context(), fmt.Sprintf(`
 		SELECT
 			COUNT(DISTINCT visitor_id) AS unique_visitors,
 			COUNT(*) AS pageviews
@@ -539,28 +529,16 @@ func (app *App) handleGetSiteStats(w http.ResponseWriter, r *http.Request) {
 		  AND created_at > NOW() - INTERVAL '%s'
 	`, interval), siteID).Scan(&stats.UniqueVisitors, &stats.Pageviews)
 	if err != nil {
-		log.Printf("handleGetSiteStats error: %v", err)
+		log.Printf("serveStats error: %v", err)
 		http.Error(w, "Failed to get stats", http.StatusInternalServerError)
 		return
 	}
-
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(stats)
 }
 
-func (app *App) handleGetSiteTraffic(w http.ResponseWriter, r *http.Request) {
-	siteID := r.PathValue("id")
-	userID := r.Context().Value(userKey).(User).ID
-
-	var ownerID int64
-	err := app.DB.QueryRow(r.Context(), `SELECT user_id FROM sites WHERE id = $1`, siteID).Scan(&ownerID)
-	if err != nil || ownerID != userID {
-		http.Error(w, "Not found", http.StatusNotFound)
-		return
-	}
-
+func (app *App) serveTraffic(w http.ResponseWriter, r *http.Request, siteID string) {
 	interval, trunc := parseDateRange(r)
-
 	rows, err := app.DB.Query(r.Context(), fmt.Sprintf(`
 		SELECT
 			DATE_TRUNC('%s', created_at) AS hour,
@@ -572,12 +550,11 @@ func (app *App) handleGetSiteTraffic(w http.ResponseWriter, r *http.Request) {
 		ORDER BY hour ASC
 	`, trunc, interval), siteID)
 	if err != nil {
-		log.Printf("handleGetSiteTraffic error: %v", err)
+		log.Printf("serveTraffic error: %v", err)
 		http.Error(w, "Failed to get traffic", http.StatusInternalServerError)
 		return
 	}
 	defer rows.Close()
-
 	var points []TrafficPoint
 	for rows.Next() {
 		var p TrafficPoint
@@ -587,26 +564,14 @@ func (app *App) handleGetSiteTraffic(w http.ResponseWriter, r *http.Request) {
 		points = append(points, p)
 	}
 	if points == nil {
-		points = []TrafficPoint{} // return [] not null
+		points = []TrafficPoint{}
 	}
-
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(points)
 }
 
-func (app *App) handleGetSitePages(w http.ResponseWriter, r *http.Request) {
-	siteID := r.PathValue("id")
-	userID := r.Context().Value(userKey).(User).ID
-
-	var ownerID int64
-	err := app.DB.QueryRow(r.Context(), `SELECT user_id FROM sites WHERE id = $1`, siteID).Scan(&ownerID)
-	if err != nil || ownerID != userID {
-		http.Error(w, "Not found", http.StatusNotFound)
-		return
-	}
-
+func (app *App) servePages(w http.ResponseWriter, r *http.Request, siteID string) {
 	interval, _ := parseDateRange(r)
-
 	rows, err := app.DB.Query(r.Context(), fmt.Sprintf(`
 		SELECT
 			path,
@@ -620,12 +585,11 @@ func (app *App) handleGetSitePages(w http.ResponseWriter, r *http.Request) {
 		LIMIT 10
 	`, interval), siteID)
 	if err != nil {
-		log.Printf("handleGetSitePages error: %v", err)
+		log.Printf("servePages error: %v", err)
 		http.Error(w, "Failed to get pages", http.StatusInternalServerError)
 		return
 	}
 	defer rows.Close()
-
 	var pages []TopPage
 	for rows.Next() {
 		var p TopPage
@@ -637,24 +601,12 @@ func (app *App) handleGetSitePages(w http.ResponseWriter, r *http.Request) {
 	if pages == nil {
 		pages = []TopPage{}
 	}
-
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(pages)
 }
 
-func (app *App) handleGetSiteCountries(w http.ResponseWriter, r *http.Request) {
-	siteID := r.PathValue("id")
-	userID := r.Context().Value(userKey).(User).ID
-
-	var ownerID int64
-	err := app.DB.QueryRow(r.Context(), `SELECT user_id FROM sites WHERE id = $1`, siteID).Scan(&ownerID)
-	if err != nil || ownerID != userID {
-		http.Error(w, "Not found", http.StatusNotFound)
-		return
-	}
-
+func (app *App) serveCountries(w http.ResponseWriter, r *http.Request, siteID string) {
 	interval, _ := parseDateRange(r)
-
 	rows, err := app.DB.Query(r.Context(), fmt.Sprintf(`
 		SELECT
 			COALESCE(country_code, 'Unknown') AS country_code,
@@ -668,12 +620,11 @@ func (app *App) handleGetSiteCountries(w http.ResponseWriter, r *http.Request) {
 		LIMIT 10
 	`, interval), siteID)
 	if err != nil {
-		log.Printf("handleGetSiteCountries error: %v", err)
+		log.Printf("serveCountries error: %v", err)
 		http.Error(w, "Failed to get countries", http.StatusInternalServerError)
 		return
 	}
 	defer rows.Close()
-
 	var countries []TopCountry
 	for rows.Next() {
 		var c TopCountry
@@ -691,24 +642,12 @@ func (app *App) handleGetSiteCountries(w http.ResponseWriter, r *http.Request) {
 	if countries == nil {
 		countries = []TopCountry{}
 	}
-
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(countries)
 }
 
-func (app *App) handleGetSiteReferrers(w http.ResponseWriter, r *http.Request) {
-	siteID := r.PathValue("id")
-	userID := r.Context().Value(userKey).(User).ID
-
-	var ownerID int64
-	err := app.DB.QueryRow(r.Context(), `SELECT user_id FROM sites WHERE id = $1`, siteID).Scan(&ownerID)
-	if err != nil || ownerID != userID {
-		http.Error(w, "Not found", http.StatusNotFound)
-		return
-	}
-
+func (app *App) serveReferrers(w http.ResponseWriter, r *http.Request, siteID string) {
 	interval, _ := parseDateRange(r)
-
 	rows, err := app.DB.Query(r.Context(), fmt.Sprintf(`
 		SELECT
 			COALESCE(NULLIF(referrer, ''), 'Direct / None') AS referrer,
@@ -722,34 +661,129 @@ func (app *App) handleGetSiteReferrers(w http.ResponseWriter, r *http.Request) {
 		LIMIT 10
 	`, interval), siteID)
 	if err != nil {
-		log.Printf("handleGetSiteReferrers error: %v", err)
+		log.Printf("serveReferrers error: %v", err)
 		http.Error(w, "Failed to get referrers", http.StatusInternalServerError)
 		return
 	}
 	defer rows.Close()
-
 	var referrers []TopReferrer
 	for rows.Next() {
 		var ref TopReferrer
 		if err := rows.Scan(&ref.Referrer, &ref.Views, &ref.UniqueVisitors); err != nil {
 			continue
 		}
-		// Clean up common URL formats simply for display
 		if ref.Referrer != "Direct / None" {
 			ref.Referrer = strings.TrimPrefix(ref.Referrer, "https://")
 			ref.Referrer = strings.TrimPrefix(ref.Referrer, "http://")
 			ref.Referrer = strings.TrimSuffix(ref.Referrer, "/")
 		}
-
 		referrers = append(referrers, ref)
 	}
 	if referrers == nil {
 		referrers = []TopReferrer{}
 	}
-
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(referrers)
 }
+
+// ── Authenticated handlers (verify site ownership, then delegate) ─────────────
+
+func (app *App) checkSiteOwnership(w http.ResponseWriter, r *http.Request, siteID string) bool {
+	userID := r.Context().Value(userKey).(User).ID
+	var ownerID int64
+	err := app.DB.QueryRow(r.Context(), `SELECT user_id FROM sites WHERE id = $1`, siteID).Scan(&ownerID)
+	if err != nil || ownerID != userID {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return false
+	}
+	return true
+}
+
+func (app *App) handleGetSiteStats(w http.ResponseWriter, r *http.Request) {
+	siteID := r.PathValue("id")
+	if !app.checkSiteOwnership(w, r, siteID) {
+		return
+	}
+	app.serveStats(w, r, siteID)
+}
+
+func (app *App) handleGetSiteTraffic(w http.ResponseWriter, r *http.Request) {
+	siteID := r.PathValue("id")
+	if !app.checkSiteOwnership(w, r, siteID) {
+		return
+	}
+	app.serveTraffic(w, r, siteID)
+}
+
+func (app *App) handleGetSitePages(w http.ResponseWriter, r *http.Request) {
+	siteID := r.PathValue("id")
+	if !app.checkSiteOwnership(w, r, siteID) {
+		return
+	}
+	app.servePages(w, r, siteID)
+}
+
+func (app *App) handleGetSiteCountries(w http.ResponseWriter, r *http.Request) {
+	siteID := r.PathValue("id")
+	if !app.checkSiteOwnership(w, r, siteID) {
+		return
+	}
+	app.serveCountries(w, r, siteID)
+}
+
+func (app *App) handleGetSiteReferrers(w http.ResponseWriter, r *http.Request) {
+	siteID := r.PathValue("id")
+	if !app.checkSiteOwnership(w, r, siteID) {
+		return
+	}
+	app.serveReferrers(w, r, siteID)
+}
+
+// ── Public demo handlers (check DEMO_SITE_ID is set, then delegate) ───────────
+
+func (app *App) demoGuard(w http.ResponseWriter) bool {
+	if app.DemoSiteID == "" {
+		http.Error(w, "Demo not configured", http.StatusServiceUnavailable)
+		return false
+	}
+	return true
+}
+
+func (app *App) handleDemoStats(w http.ResponseWriter, r *http.Request) {
+	if !app.demoGuard(w) {
+		return
+	}
+	app.serveStats(w, r, app.DemoSiteID)
+}
+
+func (app *App) handleDemoTraffic(w http.ResponseWriter, r *http.Request) {
+	if !app.demoGuard(w) {
+		return
+	}
+	app.serveTraffic(w, r, app.DemoSiteID)
+}
+
+func (app *App) handleDemoPages(w http.ResponseWriter, r *http.Request) {
+	if !app.demoGuard(w) {
+		return
+	}
+	app.servePages(w, r, app.DemoSiteID)
+}
+
+func (app *App) handleDemoCountries(w http.ResponseWriter, r *http.Request) {
+	if !app.demoGuard(w) {
+		return
+	}
+	app.serveCountries(w, r, app.DemoSiteID)
+}
+
+func (app *App) handleDemoReferrers(w http.ResponseWriter, r *http.Request) {
+	if !app.demoGuard(w) {
+		return
+	}
+	app.serveReferrers(w, r, app.DemoSiteID)
+}
+
 
 func (app *App) handleCreateSite(w http.ResponseWriter, r *http.Request) {
 	var payload CreateSitePayload
@@ -852,7 +886,7 @@ func main() {
 		RedirectURL:  os.Getenv("GITHUB_REDIRECT_URL"),
 	}
 
-	app := &App{GeoDB: geoDB, UAParser: ua, DB: db, OAuthConfig: oauthConfig}
+	app := &App{GeoDB: geoDB, UAParser: ua, DB: db, OAuthConfig: oauthConfig, DemoSiteID: os.Getenv("DEMO_SITE_ID")}
 
 	mux.HandleFunc("GET /script.js", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./public/script.js")
@@ -870,6 +904,13 @@ func main() {
 	mux.HandleFunc("GET /api/sites/{id}/pages", app.requireAuth(app.handleGetSitePages))
 	mux.HandleFunc("GET /api/sites/{id}/countries", app.requireAuth(app.handleGetSiteCountries))
 	mux.HandleFunc("GET /api/sites/{id}/referrers", app.requireAuth(app.handleGetSiteReferrers))
+
+	// Public demo endpoints
+	mux.HandleFunc("GET /api/demo/stats", app.handleDemoStats)
+	mux.HandleFunc("GET /api/demo/traffic", app.handleDemoTraffic)
+	mux.HandleFunc("GET /api/demo/pages", app.handleDemoPages)
+	mux.HandleFunc("GET /api/demo/countries", app.handleDemoCountries)
+	mux.HandleFunc("GET /api/demo/referrers", app.handleDemoReferrers)
 
 	distFS := http.Dir("./public/dist")
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {

@@ -3,6 +3,7 @@ import HomeView from '../views/HomeView.vue'
 import SitesListView from '../views/SitesListView.vue'
 import SiteDashboardView from '../views/SiteDashboardView.vue'
 import OnboardingView from '../views/OnboardingView.vue'
+import DemoView from '../views/DemoView.vue'
 import { useAuth } from '../composables/useAuth'
 
 const router = createRouter({
@@ -30,6 +31,11 @@ const router = createRouter({
       name: 'siteDashboard',
       component: SiteDashboardView,
       meta: { requiresAuth: true }
+    },
+    {
+      path: '/demo',
+      name: 'demo',
+      component: DemoView
     }
   ]
 })

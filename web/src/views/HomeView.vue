@@ -42,9 +42,10 @@ const handleGithubLogin = () => {
         <GitHub class="w-5 h-5" />
         Sign in with GitHub
       </button>
-      <a href="https://github.com/charupraneeth/simble" target="_blank"
+      <a href="/demo"
         class="inline-flex items-center justify-center gap-2 px-8 py-3 w-full sm:w-auto rounded-lg bg-gray-800 hover:bg-gray-700 text-white font-medium transition-all text-base border border-gray-700">
-        Star on GitHub
+        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse inline-block"></span>
+        Live Demo
       </a>
     </div>
 
