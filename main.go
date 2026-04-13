@@ -214,7 +214,9 @@ func (app *App) handleRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if originURL.Hostname() != payload.Domain {
+	isLocalOrigin := originURL.Hostname() == "localhost" || originURL.Hostname() == "127.0.0.1"
+
+	if originURL.Hostname() != payload.Domain && !isLocalOrigin {
 		http.Error(w, "Invalid domain", http.StatusForbidden)
 		return
 	}
@@ -225,7 +227,9 @@ func (app *App) handleRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if strings.TrimPrefix(parsedBodyURL.Hostname(), "www.") != payload.Domain {
+	isLocalPage := parsedBodyURL.Hostname() == "localhost" || parsedBodyURL.Hostname() == "127.0.0.1"
+
+	if strings.TrimPrefix(parsedBodyURL.Hostname(), "www.") != payload.Domain && !isLocalPage {
 		http.Error(w, "URL host does not match payload domain", http.StatusForbidden)
 		return
 	}
@@ -245,6 +249,12 @@ func (app *App) handleRequest(w http.ResponseWriter, r *http.Request) {
 		log.Println("error getting ip from ip string", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 
+		return
+	}
+
+	// Drop local development events so they don't pollute production data
+	if isLocalOrigin && os.Getenv("ENV") != "development" {
+		w.WriteHeader(http.StatusAccepted)
 		return
 	}
 
@@ -784,11 +794,17 @@ func (app *App) handleDemoReferrers(w http.ResponseWriter, r *http.Request) {
 	app.serveReferrers(w, r, app.DemoSiteID)
 }
 
-
 func (app *App) handleCreateSite(w http.ResponseWriter, r *http.Request) {
 	var payload CreateSitePayload
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	// Block users from registering localhost addresses, stopping local traffic theft
+	payload.Domain = strings.ToLower(strings.TrimSpace(payload.Domain))
+	if payload.Domain == "localhost" || payload.Domain == "127.0.0.1" || payload.Domain == "0.0.0.0" {
+		http.Error(w, "Invalid domain", http.StatusBadRequest)
 		return
 	}
 
