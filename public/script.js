@@ -7,7 +7,7 @@
     const apiUrl = new URL('/api/event', scriptTag.src).href;
 
     // Helper to send the analytics payload
-    function sendEvent() {
+    function sendEvent(eventName = "pageview") {
         fetch(apiUrl, {
             method: 'POST',
             headers: {
@@ -15,7 +15,7 @@
             },
             body: JSON.stringify({
                 "domain": domain,
-                "name": "pageview",
+                "name": eventName,
                 "referer": document.referrer || null,
                 "url": window.location.href
             })
@@ -25,7 +25,7 @@
     }
 
     // 2. Track initial page load
-    sendEvent();
+    sendEvent("pageview");
 
     // 3. Track SPA (Single Page Application) route changes
     let lastUrl = window.location.href;
@@ -33,7 +33,7 @@
     function handleRouteChange() {
         if (lastUrl !== window.location.href) {
             lastUrl = window.location.href;
-            sendEvent();
+            sendEvent("pageview");
         }
     }
 
@@ -51,4 +51,11 @@
     history.replaceState = function (...args) {
         originalReplaceState.apply(this, args);
         handleRouteChange();
-    };})()
+
+    };
+
+    // Execute any events that were queued before this script loaded
+    const q = window.simble && window.simble.q ? window.simble.q : [];
+    window.simble = sendEvent;
+    q.forEach(args => sendEvent.apply(null, args));
+})()

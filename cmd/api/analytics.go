@@ -145,10 +145,13 @@ func (app *App) handleRequest(w http.ResponseWriter, r *http.Request) {
 	visitorID := utils.GetDailyVisitorID(host, uaString, salt)
 
 	insertQuery := `INSERT INTO analytics(
- 					site_id, visitor_id, path, browser_name, device_type, os_name, country_code, city_name, referrer
+ 					site_id, visitor_id, path, browser_name, device_type, os_name, country_code, city_name, referrer, name
 					)
-					VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9);`
+					VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);`
 
+	if payload.Name == "" {
+		payload.Name = "pageview"
+	}
 	event := Event{
 		Device:      agent.Device().String(),
 		Browser:     agent.Browser().String(),
@@ -162,7 +165,7 @@ func (app *App) handleRequest(w http.ResponseWriter, r *http.Request) {
 		SiteID:      siteID,
 	}
 
-	_, err = app.DB.Exec(r.Context(), insertQuery, event.SiteID, event.VisitorID, event.Path, event.Browser, event.Device, event.Os, event.CountryCode, event.City, event.Referer)
+	_, err = app.DB.Exec(r.Context(), insertQuery, event.SiteID, event.VisitorID, event.Path, event.Browser, event.Device, event.Os, event.CountryCode, event.City, event.Referer, event.Name)
 
 	if err != nil {
 		log.Printf("CRITICAL: Failed to insert analytics event for site %d: %v", siteID, err)

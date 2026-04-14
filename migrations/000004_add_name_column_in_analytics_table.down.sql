@@ -1,0 +1,1 @@
+-- Intentionally left empty as the down might not be needed for this migration
