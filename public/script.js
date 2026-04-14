@@ -54,6 +54,21 @@
 
     };
 
+    // 4. Track custom events via CSS classes (e.g., class="simble-event-Signup")
+    document.addEventListener('click', function (event) {
+        const target = event.target.closest('[class*="simble-event-"]');
+        if (target) {
+            const classes = target.className.split(' ');
+            for (const cls of classes) {
+                if (cls.startsWith('simble-event-')) {
+                    const eventName = cls.replace('simble-event-', '').replace(/_/g, ' ');
+                    sendEvent(eventName);
+                    break;
+                }
+            }
+        }
+    });
+
     // Execute any events that were queued before this script loaded
     const q = window.simble && window.simble.q ? window.simble.q : [];
     window.simble = sendEvent;
