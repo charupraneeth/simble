@@ -40,7 +40,7 @@ onMounted(async () => {
         <p class="text-gray-400">Manage your tracked properties.</p>
       </div>
       <button
-        class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-emerald-950 font-bold transition-all shadow-lg shadow-emerald-500/20 text-sm"
+        class="simble-event-Clicked_Add_Site inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-emerald-950 font-bold transition-all shadow-lg shadow-emerald-500/20 text-sm"
         @click="router.push('/onboarding')">
         <Plus class="w-4 h-4" />
         Add site
@@ -81,7 +81,7 @@ onMounted(async () => {
 
       <!-- Add New Site Card (Dashed) -->
       <button
-        class="rounded-xl border-2 border-dashed border-gray-800 hover:border-emerald-500/50 bg-transparent flex flex-col items-center justify-center gap-4 text-gray-400 hover:text-emerald-400 hover:bg-gray-900/50 transition-all min-h-[220px] focus:outline-none focus:ring-2 focus:ring-emerald-500"
+        class="simble-event-Clicked_Add_Site rounded-xl border-2 border-dashed border-gray-800 hover:border-emerald-500/50 bg-transparent flex flex-col items-center justify-center gap-4 text-gray-400 hover:text-emerald-400 hover:bg-gray-900/50 transition-all min-h-[220px] focus:outline-none focus:ring-2 focus:ring-emerald-500"
         @click="router.push('/onboarding')">
         <div class="w-12 h-12 rounded-full bg-gray-800 flex items-center justify-center">
           <Plus class="w-6 h-6" />

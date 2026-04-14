@@ -46,11 +46,14 @@ const submitSite = async () => {
     if (response.ok) {
       step.value = 2
     } else if (response.status === 409) {
+      if (typeof window !== 'undefined' && (window as any).simble) { (window as any).simble('Failed_Site_Registration_Conflict') }
       submitError.value = 'This domain is already registered. Use a different domain or go to your dashboard.'
     } else {
+      if (typeof window !== 'undefined' && (window as any).simble) { (window as any).simble('Failed_Site_Registration_API_Error') }
       submitError.value = 'Something went wrong. Please try again.'
     }
   } catch (error) {
+    if (typeof window !== 'undefined' && (window as any).simble) { (window as any).simble('Failed_Site_Registration_Network') }
     submitError.value = 'Network error. Check your connection and try again.'
   } finally {
     isSubmitting.value = false
@@ -88,7 +91,7 @@ const submitSite = async () => {
         </div>
 
         <button @click="submitSite" :disabled="!isFormValid || isSubmitting"
-          class="mt-4 w-full flex items-center justify-center gap-2 h-12 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed text-emerald-950 font-bold rounded-lg transition-all">
+          class="simble-event-Registered_Site mt-4 w-full flex items-center justify-center gap-2 h-12 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed text-emerald-950 font-bold rounded-lg transition-all">
           <template v-if="isSubmitting">
             <svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -126,7 +129,7 @@ const submitSite = async () => {
         </div>
 
         <button @click="router.push('/sites')"
-          class="mt-4 w-full h-12 bg-emerald-500 hover:bg-emerald-400 text-emerald-950 font-bold rounded-lg shadow-emerald-500/20 shadow-lg transition-all">
+          class="simble-event-Went_to_Dashboard mt-4 w-full h-12 bg-emerald-500 hover:bg-emerald-400 text-emerald-950 font-bold rounded-lg shadow-emerald-500/20 shadow-lg transition-all">
           Go to Dashboard
         </button>
       </div>

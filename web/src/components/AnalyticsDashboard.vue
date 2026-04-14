@@ -72,6 +72,9 @@ async function fetchData(r: string) {
 function setRange(r: '24h' | '7d' | '30d') {
   range.value = r
   fetchData(r)
+  if (typeof window !== 'undefined' && (window as any).simble) {
+    (window as any).simble('Changed_Time_Range_to_' + r)
+  }
 }
 
 onMounted(() => fetchData(range.value))

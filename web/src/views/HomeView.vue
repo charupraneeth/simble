@@ -37,13 +37,13 @@ const handleGithubLogin = () => {
     <!-- Buttons -->
     <div class="flex flex-col sm:flex-row items-center gap-4 w-full justify-center mb-16">
       <button
-        class="inline-flex items-center justify-center gap-2 px-8 py-3 w-full sm:w-auto rounded-lg bg-emerald-500 hover:bg-emerald-400 text-emerald-950 font-bold transition-all shadow-lg shadow-emerald-500/25 group text-base"
+        class="simble-event-Clicked_Sign_In inline-flex items-center justify-center gap-2 px-8 py-3 w-full sm:w-auto rounded-lg bg-emerald-500 hover:bg-emerald-400 text-emerald-950 font-bold transition-all shadow-lg shadow-emerald-500/25 group text-base"
         @click="handleGithubLogin">
         <GitHub class="w-5 h-5" />
         Sign in with GitHub
       </button>
       <a href="/demo"
-        class="inline-flex items-center justify-center gap-2 px-8 py-3 w-full sm:w-auto rounded-lg bg-gray-800 text-white font-medium transition-all duration-300 text-base border border-gray-700 hover:bg-gray-800/80 hover:border-emerald-500/40 hover:text-emerald-400 hover:shadow-[0_0_20px_rgba(16,185,129,0.1)]">
+        class="simble-event-Clicked_Live_Demo inline-flex items-center justify-center gap-2 px-8 py-3 w-full sm:w-auto rounded-lg bg-gray-800 text-white font-medium transition-all duration-300 text-base border border-gray-700 hover:bg-gray-800/80 hover:border-emerald-500/40 hover:text-emerald-400 hover:shadow-[0_0_20px_rgba(16,185,129,0.1)]">
         <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse inline-block group-hover:bg-emerald-400"></span>
         Live Demo
       </a>

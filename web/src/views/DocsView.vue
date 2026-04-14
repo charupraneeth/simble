@@ -41,6 +41,9 @@ async function copy(snippet: Snippet) {
   try {
     await navigator.clipboard.writeText(snippet.code)
     snippet.copied = true
+    if (typeof window !== 'undefined' && (window as any).simble) {
+      (window as any).simble('Copied_Docs_Snippet_' + snippet.label)
+    }
     setTimeout(() => (snippet.copied = false), 2000)
   } catch {}
 }
