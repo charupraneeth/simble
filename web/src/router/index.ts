@@ -4,6 +4,7 @@ import SitesListView from '../views/SitesListView.vue'
 import SiteDashboardView from '../views/SiteDashboardView.vue'
 import OnboardingView from '../views/OnboardingView.vue'
 import DemoView from '../views/DemoView.vue'
+import DocsView from '../views/DocsView.vue'
 import { useAuth } from '../composables/useAuth'
 
 const router = createRouter({
@@ -36,6 +37,11 @@ const router = createRouter({
       path: '/demo',
       name: 'demo',
       component: DemoView
+    },
+    {
+      path: '/docs',
+      name: 'docs',
+      component: DocsView
     }
   ]
 })

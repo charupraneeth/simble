@@ -35,6 +35,10 @@ const initials = (username: string) => username.slice(0, 2).toUpperCase()
       <!-- Right Side -->
       <div class="flex items-center gap-4">
 
+        <router-link to="/docs" class="text-sm font-medium text-gray-400 hover:text-white transition-colors mr-2">
+          Docs
+        </router-link>
+
         <!-- Loading State -->
         <template v-if="loading">
            <svg class="animate-spin h-5 w-5 text-emerald-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
