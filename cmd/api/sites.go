@@ -43,7 +43,7 @@ func (app *App) serveStats(w http.ResponseWriter, r *http.Request, siteID string
 	err := app.DB.QueryRow(r.Context(), fmt.Sprintf(`
 		SELECT
 			COUNT(DISTINCT visitor_id) AS unique_visitors,
-			COUNT(*) AS pageviews
+			COUNT(*) FILTER(where name='pageview') AS pageviews
 		FROM analytics
 		WHERE site_id = $1
 		  AND created_at > NOW() - INTERVAL '%s'
@@ -99,6 +99,7 @@ func (app *App) servePages(w http.ResponseWriter, r *http.Request, siteID string
 			COUNT(DISTINCT visitor_id) AS unique_visitors
 		FROM analytics
 		WHERE site_id = $1
+		  AND name='pageview'
 		  AND created_at > NOW() - INTERVAL '%s'
 		GROUP BY path
 		ORDER BY views DESC
@@ -206,6 +207,42 @@ func (app *App) serveReferrers(w http.ResponseWriter, r *http.Request, siteID st
 	json.NewEncoder(w).Encode(referrers)
 }
 
+func (app *App) serveEvents(w http.ResponseWriter, r *http.Request, siteID string) {
+	interval, _ := parseDateRange(r)
+	rows, err := app.DB.Query(r.Context(), fmt.Sprintf(`
+		SELECT
+			name,
+			COUNT(*) AS events,
+			COUNT(DISTINCT visitor_id) AS unique_visitors
+		FROM analytics
+		WHERE site_id = $1
+		  AND name != 'pageview'
+		  AND created_at > NOW() - INTERVAL '%s'
+		GROUP BY name
+		ORDER BY unique_visitors DESC
+		LIMIT 10
+	`, interval), siteID)
+	if err != nil {
+		log.Printf("serveEvents error: %v", err)
+		http.Error(w, "Failed to get events", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+	var events []TopEvent
+	for rows.Next() {
+		var e TopEvent
+		if err := rows.Scan(&e.Name, &e.Events, &e.UniqueVisitors); err != nil {
+			continue
+		}
+		events = append(events, e)
+	}
+	if events == nil {
+		events = []TopEvent{}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(events)
+}
+
 // ── Authenticated handlers (verify site ownership, then delegate) ─────────────
 
 func (app *App) handleGetSiteStats(w http.ResponseWriter, r *http.Request) {
@@ -246,6 +283,14 @@ func (app *App) handleGetSiteReferrers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	app.serveReferrers(w, r, siteID)
+}
+
+func (app *App) handleGetSiteEvents(w http.ResponseWriter, r *http.Request) {
+	siteID := r.PathValue("id")
+	if !app.checkSiteOwnership(w, r, siteID) {
+		return
+	}
+	app.serveEvents(w, r, siteID)
 }
 
 // ── Public demo handlers (check DEMO_SITE_ID is set, then delegate) ───────────
@@ -291,6 +336,13 @@ func (app *App) handleDemoReferrers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	app.serveReferrers(w, r, app.DemoSiteID)
+}
+
+func (app *App) handleDemoEvents(w http.ResponseWriter, r *http.Request) {
+	if !app.demoGuard(w) {
+		return
+	}
+	app.serveEvents(w, r, app.DemoSiteID)
 }
 
 // ── Sites CRUD ────────────────────────────────────────────────────────────────

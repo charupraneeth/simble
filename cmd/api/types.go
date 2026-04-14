@@ -73,3 +73,9 @@ type TopReferrer struct {
 	Views          int64  `json:"views"`
 	UniqueVisitors int64  `json:"unique_visitors"`
 }
+
+type TopEvent struct {
+	Name           string `json:"name"`
+	Events         int64  `json:"events"`
+	UniqueVisitors int64  `json:"unique_visitors"`
+}

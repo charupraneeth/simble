@@ -75,6 +75,7 @@ func main() {
 	mux.HandleFunc("GET /api/sites/{id}/pages", app.requireAuth(app.handleGetSitePages))
 	mux.HandleFunc("GET /api/sites/{id}/countries", app.requireAuth(app.handleGetSiteCountries))
 	mux.HandleFunc("GET /api/sites/{id}/referrers", app.requireAuth(app.handleGetSiteReferrers))
+	mux.HandleFunc("GET /api/sites/{id}/events", app.requireAuth(app.handleGetSiteEvents))
 
 	// Public demo endpoints
 	mux.HandleFunc("GET /api/demo/stats", app.handleDemoStats)
@@ -82,6 +83,7 @@ func main() {
 	mux.HandleFunc("GET /api/demo/pages", app.handleDemoPages)
 	mux.HandleFunc("GET /api/demo/countries", app.handleDemoCountries)
 	mux.HandleFunc("GET /api/demo/referrers", app.handleDemoReferrers)
+	mux.HandleFunc("GET /api/demo/events", app.handleDemoEvents)
 
 	distFS := http.Dir("./public/dist")
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {

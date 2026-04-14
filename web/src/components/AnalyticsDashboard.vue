@@ -26,12 +26,14 @@ interface TrafficPoint { hour: string; visitors: number }
 interface TopPage { path: string; views: number; unique_visitors: number }
 interface TopCountry { country_code: string; views: number; unique_visitors: number }
 interface TopReferrer { referrer: string; views: number; unique_visitors: number }
+interface TopEvent { name: string; events: number; unique_visitors: number }
 
 const stats = ref<Stats | null>(null)
 const traffic = ref<TrafficPoint[]>([])
 const pages = ref<TopPage[]>([])
 const countries = ref<TopCountry[]>([])
 const referrers = ref<TopReferrer[]>([])
+const events = ref<TopEvent[]>([])
 const isLoading = ref(true)
 const range = ref<'24h' | '7d' | '30d'>('7d')
 
@@ -45,12 +47,13 @@ const RANGES: { label: string; value: '24h' | '7d' | '30d' }[] = [
 async function fetchData(r: string) {
   isLoading.value = true
   try {
-    const [statsRes, trafficRes, pagesRes, countriesRes, referrersRes] = await Promise.all([
+    const [statsRes, trafficRes, pagesRes, countriesRes, referrersRes, eventsRes] = await Promise.all([
       fetch(`${props.baseUrl}/stats?range=${r}`),
       fetch(`${props.baseUrl}/traffic?range=${r}`),
       fetch(`${props.baseUrl}/pages?range=${r}`),
       fetch(`${props.baseUrl}/countries?range=${r}`),
       fetch(`${props.baseUrl}/referrers?range=${r}`),
+      fetch(`${props.baseUrl}/events?range=${r}`),
       new Promise(resolve => setTimeout(resolve, 600)), // min skeleton duration
     ])
     if (statsRes.ok) stats.value = await statsRes.json()
@@ -58,6 +61,7 @@ async function fetchData(r: string) {
     if (pagesRes.ok) pages.value = await pagesRes.json()
     if (countriesRes.ok) countries.value = await countriesRes.json()
     if (referrersRes.ok) referrers.value = await referrersRes.json()
+    if (eventsRes.ok) events.value = await eventsRes.json()
   } catch (e) {
     console.error('Failed to load dashboard data', e)
   } finally {
@@ -206,7 +210,7 @@ const formatNum = (n: number) =>
     </div>
 
     <!-- Data Tables Row -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
       <!-- Top Pages -->
       <div class="p-6 border border-gray-800 rounded-xl bg-gray-900/60">
@@ -283,6 +287,28 @@ const formatNum = (n: number) =>
           </div>
         </div>
         <div v-else class="text-center text-gray-600 text-sm py-8">No referrer data yet for this period.</div>
+      </div>
+
+      <!-- Top Events -->
+      <div class="p-6 border border-gray-800 rounded-xl bg-gray-900/60">
+        <h2 class="text-sm font-semibold uppercase tracking-widest text-gray-400 mb-6">Top Events</h2>
+        <div v-if="events.length > 0">
+          <div class="grid grid-cols-3 text-xs text-gray-500 uppercase tracking-widest pb-3 border-b border-gray-800 mb-2">
+            <span>Name</span>
+            <span class="text-right">Events</span>
+            <span class="text-right">Unique</span>
+          </div>
+          <div
+            v-for="ev in events"
+            :key="ev.name"
+            class="grid grid-cols-3 py-3 border-b border-gray-800/50 text-sm hover:bg-gray-800/30 px-1 rounded transition-colors"
+          >
+            <span class="text-gray-300 font-mono truncate mr-2">{{ ev.name }}</span>
+            <span class="text-right text-white font-medium">{{ formatNum(ev.events) }}</span>
+            <span class="text-right text-gray-400">{{ formatNum(ev.unique_visitors) }}</span>
+          </div>
+        </div>
+        <div v-else class="text-center text-gray-600 text-sm py-8">No custom events tracked yet.</div>
       </div>
 
     </div>
