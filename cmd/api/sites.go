@@ -40,14 +40,14 @@ func (app *App) checkSiteOwnership(w http.ResponseWriter, r *http.Request, siteI
 func (app *App) serveStats(w http.ResponseWriter, r *http.Request, siteID string) {
 	interval, _ := parseDateRange(r)
 	var stats SiteStats
-	err := app.DB.QueryRow(r.Context(), fmt.Sprintf(`
+	err := app.DB.QueryRow(r.Context(), `
 		SELECT
 			COUNT(DISTINCT visitor_id) AS unique_visitors,
 			COUNT(*) FILTER(where name='pageview') AS pageviews
 		FROM analytics
 		WHERE site_id = $1
-		  AND created_at > NOW() - INTERVAL '%s'
-	`, interval), siteID).Scan(&stats.UniqueVisitors, &stats.Pageviews)
+		  AND created_at > NOW() - $2::INTERVAL
+	`, siteID, interval).Scan(&stats.UniqueVisitors, &stats.Pageviews)
 	if err != nil {
 		log.Printf("serveStats error: %v", err)
 		http.Error(w, "Failed to get stats", http.StatusInternalServerError)
@@ -59,16 +59,16 @@ func (app *App) serveStats(w http.ResponseWriter, r *http.Request, siteID string
 
 func (app *App) serveTraffic(w http.ResponseWriter, r *http.Request, siteID string) {
 	interval, trunc := parseDateRange(r)
-	rows, err := app.DB.Query(r.Context(), fmt.Sprintf(`
+	rows, err := app.DB.Query(r.Context(), `
 		SELECT
-			DATE_TRUNC('%s', created_at) AS hour,
+			DATE_TRUNC($1, created_at) AS hour,
 			COUNT(DISTINCT visitor_id) AS visitors
 		FROM analytics
-		WHERE site_id = $1
-		  AND created_at > NOW() - INTERVAL '%s'
+		WHERE site_id = $2
+		  AND created_at > NOW() - $3::INTERVAL
 		GROUP BY hour
 		ORDER BY hour ASC
-	`, trunc, interval), siteID)
+	`, trunc, siteID, interval)
 	if err != nil {
 		log.Printf("serveTraffic error: %v", err)
 		http.Error(w, "Failed to get traffic", http.StatusInternalServerError)
@@ -92,7 +92,7 @@ func (app *App) serveTraffic(w http.ResponseWriter, r *http.Request, siteID stri
 
 func (app *App) servePages(w http.ResponseWriter, r *http.Request, siteID string) {
 	interval, _ := parseDateRange(r)
-	rows, err := app.DB.Query(r.Context(), fmt.Sprintf(`
+	rows, err := app.DB.Query(r.Context(), `
 		SELECT
 			path,
 			COUNT(*) AS views,
@@ -100,11 +100,11 @@ func (app *App) servePages(w http.ResponseWriter, r *http.Request, siteID string
 		FROM analytics
 		WHERE site_id = $1
 		  AND name='pageview'
-		  AND created_at > NOW() - INTERVAL '%s'
+		  AND created_at > NOW() - $2::INTERVAL
 		GROUP BY path
 		ORDER BY views DESC
 		LIMIT 10
-	`, interval), siteID)
+	`, siteID, interval)
 	if err != nil {
 		log.Printf("servePages error: %v", err)
 		http.Error(w, "Failed to get pages", http.StatusInternalServerError)
@@ -128,18 +128,18 @@ func (app *App) servePages(w http.ResponseWriter, r *http.Request, siteID string
 
 func (app *App) serveCountries(w http.ResponseWriter, r *http.Request, siteID string) {
 	interval, _ := parseDateRange(r)
-	rows, err := app.DB.Query(r.Context(), fmt.Sprintf(`
+	rows, err := app.DB.Query(r.Context(), `
 		SELECT
 			COALESCE(country_code, 'Unknown') AS country_code,
 			COUNT(*) AS views,
 			COUNT(DISTINCT visitor_id) AS unique_visitors
 		FROM analytics
 		WHERE site_id = $1
-		  AND created_at > NOW() - INTERVAL '%s'
+		  AND created_at > NOW() - $2::INTERVAL
 		GROUP BY country_code
 		ORDER BY unique_visitors DESC
 		LIMIT 10
-	`, interval), siteID)
+	`, siteID, interval)
 	if err != nil {
 		log.Printf("serveCountries error: %v", err)
 		http.Error(w, "Failed to get countries", http.StatusInternalServerError)
@@ -169,18 +169,18 @@ func (app *App) serveCountries(w http.ResponseWriter, r *http.Request, siteID st
 
 func (app *App) serveReferrers(w http.ResponseWriter, r *http.Request, siteID string) {
 	interval, _ := parseDateRange(r)
-	rows, err := app.DB.Query(r.Context(), fmt.Sprintf(`
+	rows, err := app.DB.Query(r.Context(), `
 		SELECT
 			COALESCE(NULLIF(referrer, ''), 'Direct / None') AS referrer,
 			COUNT(*) AS views,
 			COUNT(DISTINCT visitor_id) AS unique_visitors
 		FROM analytics
 		WHERE site_id = $1
-		  AND created_at > NOW() - INTERVAL '%s'
+		  AND created_at > NOW() - $2::INTERVAL
 		GROUP BY 1
 		ORDER BY unique_visitors DESC
 		LIMIT 10
-	`, interval), siteID)
+	`, siteID, interval)
 	if err != nil {
 		log.Printf("serveReferrers error: %v", err)
 		http.Error(w, "Failed to get referrers", http.StatusInternalServerError)
@@ -209,7 +209,7 @@ func (app *App) serveReferrers(w http.ResponseWriter, r *http.Request, siteID st
 
 func (app *App) serveEvents(w http.ResponseWriter, r *http.Request, siteID string) {
 	interval, _ := parseDateRange(r)
-	rows, err := app.DB.Query(r.Context(), fmt.Sprintf(`
+	rows, err := app.DB.Query(r.Context(), `
 		SELECT
 			name,
 			COUNT(*) AS events,
@@ -217,11 +217,11 @@ func (app *App) serveEvents(w http.ResponseWriter, r *http.Request, siteID strin
 		FROM analytics
 		WHERE site_id = $1
 		  AND name != 'pageview'
-		  AND created_at > NOW() - INTERVAL '%s'
+		  AND created_at > NOW() - $2::INTERVAL
 		GROUP BY name
 		ORDER BY unique_visitors DESC
 		LIMIT 10
-	`, interval), siteID)
+	`, siteID, interval)
 	if err != nil {
 		log.Printf("serveEvents error: %v", err)
 		http.Error(w, "Failed to get events", http.StatusInternalServerError)
